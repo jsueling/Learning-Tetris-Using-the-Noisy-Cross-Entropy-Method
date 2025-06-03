@@ -10,28 +10,35 @@ class Figure:
     y = 0
 #liste des 6 différentes figures et leur rotation
     figures = [ 
-        [[1, 5, 9, 13], [4, 5, 6, 7]],
-        [[4, 5, 9, 10], [2, 6, 5, 9]],
-        [[6, 7, 9, 10], [1, 5, 6, 10]],
-        [[1, 2, 5, 9], [0, 4, 5, 6], [1, 5, 9, 8], [4, 5, 6, 10]],
-        [[1, 2, 6, 10], [5, 6, 7, 9], [2, 6, 10, 11], [3, 5, 6, 7]],
-        [[1, 4, 5, 6], [1, 4, 5, 9], [4, 5, 6, 9], [1, 5, 6, 9]],
-        [[1, 2, 5, 6]],
+        [[0, 4, 8, 12], [0, 1, 2, 3], [0, 4, 8, 12], [0, 1, 2, 3]], # I
+        [[0, 1, 5, 6], [1, 4, 5, 8], [0, 1, 5, 6], [1, 4, 5, 8]], # Z
+        [[4, 5, 1, 2], [0, 4, 5, 9], [4, 5, 1, 2], [0, 4, 5, 9]], # S
+        [[1, 0, 4, 8], [0, 4, 5, 6], [1, 5, 9, 8], [0, 1, 2, 6]], # J
+        [[0, 1, 5, 9], [4, 0, 1, 2], [0, 4, 8, 9], [4, 5, 6, 2]], # L
+        [[1, 4, 5, 6], [1, 4, 5, 9], [0, 1, 2, 5], [0, 4, 8, 5]], # T
+        [[0, 1, 4, 5], [0, 1, 4, 5], [0, 1, 4, 5], [0, 1, 4, 5]], # O
     ]
 
-    def __init__(self, x, y, type): 
+    # Each Figure's position is represented by
+    # The following 4x4 grid:
+
+    #  0  1  2  3
+    #  4  5  6  7
+    #  8  9 10 11
+    # 12 13 14 15
+
+    # The Figure's (x, y) coordinates reference the position
+    # of where cell 0 in the 4x4 grid is located in the 10x20 grid.
+
+    def __init__(self, x, y, fig_type, rotation): 
         self.x = x #position de la pièce sur la largeur du jeu 
         self.y = y #position de la pièce sur la longueur du jeu
-        self.type = type #type de la pièce entre 1 et 6
-        self.rotation = 0 #rotatio de la pièce
+        self.type = fig_type #type de la pièce entre 0 et 6
+        self.rotation = rotation #rotation de la pièce
 
     #séléction de la pièce (type et rotation) dans la liste figures
     def image(self):
         return self.figures[self.type][self.rotation]
-    
-    #méthode pour faire pivoter la pièce
-    def rotate(self,k):
-        self.rotation = (self.rotation + k) % len(self.figures[self.type])
 
 class Tetris:
     def __init__(self, height, width): #initialisation du jeu 
@@ -43,8 +50,8 @@ class Tetris:
         self.score = 0
         self.state = "start"
 
-    def new_figure(self,type,x,y):
-        self.figure = Figure(x, y,type) #introduction d'une nouvelle figure type en (x,y) 
+    def new_figure(self,fig_type,x,y,rotation):
+        self.figure = Figure(x, y,fig_type,rotation) #introduction d'une nouvelle figure type en (x,y) 
 
     def intersects(self): #check if the currently flying figure intersecting with something fixed on the field. 
         intersection = False
@@ -86,19 +93,6 @@ class Tetris:
                 if i * 4 + j in self.figure.image():
                     self.field[i + self.figure.y][j + self.figure.x] = color
         self.break_lines()
-
-    def go_side(self, dx): #decale la pièce de dx (gauche si dx<0 droite sinon)
-        old_x = self.figure.x
-        self.figure.x += dx
-        if self.intersects():
-            self.figure.x = old_x
-
-    def rotate(self,k):
-        old_rotation = self.figure.rotation
-        self.figure.rotate(k)
-        if self.intersects():
-            self.figure.rotation = old_rotation
-
 
 #Features du jeu 
 #retourne la taille des 10 colonnes du jeu 
@@ -165,25 +159,26 @@ def evaluate(W, field):
     return(S1+S2+S3+S4)
 
 #pour une configuration et une nouvelle piece donné, retourne le meilleur coup au sens de evaluate()
-def evaluate_best_move(W,field,type,color):
+def evaluate_best_move(W,field,fig_type,color):
     L=[]
     score=[]
     for k in range (4):
-        for col in range (-5,10):
+        for col in range(10):
         
             game_copy=Tetris(20,10)
             
             game_copy.field=copy.deepcopy(field)
 
-            game_copy.new_figure(type,3,0)
-            game_copy.rotate(k)
-            game_copy.go_side(col) 
-            
+            # Try to place Tetromino at (col, 0) with rotation k
+            game_copy.new_figure(fig_type,col,0,k)
 
-            if game_copy.intersects()==False:
-                game_copy.hard_drop(color)
-                score.append(evaluate(W,game_copy.field))
-                L.append([col,k])
+            if game_copy.intersects():
+                continue
+
+            game_copy.hard_drop(color)
+            score.append(evaluate(W,game_copy.field))
+            L.append([col,k])
+
     if len(L)>0:
         best_move=score.index(min(score))
         return(L[best_move])
@@ -193,20 +188,21 @@ def evaluate_best_move(W,field,type,color):
 #simule une partie 
 def simulation(W):
 
-
     game = Tetris(20, 10)
     while game.state!="gameover":
 
-        fig=random.randint(0,6)
+        fig_type=random.randint(0,6)
         color=1
-        game.new_figure(fig,3,0)
+        
+        # Evaluates all possible columns and rotations for the current Tetromino
+        col, rot = evaluate_best_move(W,game.field,fig_type,color)
 
-        col, rot = evaluate_best_move(W,game.field,fig,color)
-        game.rotate(rot)
-        game.go_side(col)
+        # Attempt to place the Tetromino in the best column and rotation
+        game.new_figure(fig_type,col,0,rot)
+        
+        # Check since evaluate_best_move may return (col, rot) that is already occupied
         if game.intersects():
             game.state="gameover"
-        
         else:
             game.hard_drop(color)
 
@@ -220,16 +216,17 @@ def simulation_gif(W): #Pas encore optimisé pour les pièces qui arrivent en ha
 
         while game.state!="gameover":
 
-            fig=random.randint(0,6)
+            fig_type=random.randint(0,6)
             color=random.randint(1,4)
-            game.new_figure(fig,3,0)
+
+            col, rot = evaluate_best_move(W,game.field,fig_type,color)
+
+            game.new_figure(fig_type,col,0,rot)
+
             if game.intersects():
                 game.state="gameover"
-
-            col, rot = evaluate_best_move(W,game.field,fig,color)
-            game.rotate(rot)
-            game.go_side(col)
-            game.hard_drop(color)
+            else:
+                game.hard_drop(color)
             
             fig, ax = plt.subplots()
             ax.set_title(str(game.score))
