@@ -1,4 +1,4 @@
-import numpy
+import numpy as np
 import random
 import copy 
 import matplotlib.pyplot as plt
@@ -35,28 +35,13 @@ class Figure:
 
 class Tetris:
     def __init__(self, height, width): #initialisation du jeu 
-        self.score = 0 #score du jeu 
-        self.state = "start" #état du jeu (gameover si le jeu est fini)
-        self.field = [] # grille de jeu
-        self.height = 0 #hauteur du jeu
-        self.width = 0 #largeur du jeu 
-        self.x = 100
-        self.y = 60
+
         self.figure = None
-    
         self.height = height
         self.width = width
-        self.field = []
+        self.field = np.zeros((height, width), dtype=int)
         self.score = 0
         self.state = "start"
-
-        for i in range(height): # creation de la grille de taille height x width 
-            new_line = []
-
-            for j in range(width):
-                new_line.append(0)
-                
-            self.field.append(new_line)
 
     def new_figure(self,type,x,y):
         self.figure = Figure(x, y,type) #introduction d'une nouvelle figure type en (x,y) 
@@ -87,9 +72,9 @@ class Tetris:
                 for i1 in range(i, 1, -1):
                     for j in range(self.width):
                         self.field[i1][j] = self.field[i1 - 1][j]
-        self.score += lines ** 2
+        self.score += lines #** 2 -- remove Tetris line-clear bonus for now
 
-    def go_space(self,color): #descend la pièce jusqu'en bas 
+    def hard_drop(self,color): #descend la pièce jusqu'en bas 
         while not self.intersects():
             self.figure.y += 1
         self.figure.y -= 1
@@ -196,7 +181,7 @@ def evaluate_best_move(W,field,type,color):
             
 
             if game_copy.intersects()==False:
-                game_copy.go_space(color)
+                game_copy.hard_drop(color)
                 score.append(evaluate(W,game_copy.field))
                 L.append([col,k])
     if len(L)>0:
@@ -223,40 +208,33 @@ def simulation(W):
             game.state="gameover"
         
         else:
-            game.go_space(color)
+            game.hard_drop(color)
 
     return(game.score)
 
 def simulation_gif(W): #Pas encore optimisé pour les pièces qui arrivent en haut
-    L=[]
 
-    game = Tetris(20, 10)
-    while game.state!="gameover":
-
-
-        fig=random.randint(0,6)
-        color=random.randint(1,4)
-        game.new_figure(fig,3,0)
-        if game.intersects():
-            game.state="gameover"
-
-        col, rot = evaluate_best_move(W,game.field,fig,color)
-        game.rotate(rot)
-        game.go_side(col)
-        game.go_space(color)
-        
-        fig, ax = plt.subplots()
-        ax.set_title(str(game.score))
-        ax.matshow(game.field, cmap='Blues')
-        L.append(fig)
-
-    return(L)  
-
-
-def get_gif (L): #L: list of figures as returned by simulation_gif
     with imageio.get_writer('tetris.gif', mode='I') as writer:
 
-        for fig in L:
+        game = Tetris(20, 10)
+
+        while game.state!="gameover":
+
+            fig=random.randint(0,6)
+            color=random.randint(1,4)
+            game.new_figure(fig,3,0)
+            if game.intersects():
+                game.state="gameover"
+
+            col, rot = evaluate_best_move(W,game.field,fig,color)
+            game.rotate(rot)
+            game.go_side(col)
+            game.hard_drop(color)
+            
+            fig, ax = plt.subplots()
+            ax.set_title(str(game.score))
+            ax.matshow(game.field, cmap='Blues')
             fig.canvas.draw()
             image = imageio.core.asarray(fig.canvas.renderer.buffer_rgba())
             writer.append_data(image)
+            plt.close(fig)
