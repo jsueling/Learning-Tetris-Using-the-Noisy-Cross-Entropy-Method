@@ -5,13 +5,20 @@ from scipy import stats
 from scipy.optimize import minimize
 import Tetris
 from tqdm import tqdm
+import multiprocessing as mp
 
+def evaluate_sample(sample):
+    """Helper function to evaluate a single sample."""
+    return Tetris.simulation(sample)
 
-def simulation_CE_const_noise(alpha, N_iteration,rho,noise): #alpha : taux d'actualistion 
+def simulation_CE_const_noise(alpha, N_iteration,rho,noise, n_processes=None): #alpha : taux d'actualistion 
                                #N_iteration : nombre d'iterations
                                #rho : the fraction of verctors that are selected
                                #noise : value of the constant noise to add 
-                               
+    
+    if n_processes is None:
+        n_processes = mp.cpu_count() - 1
+
     # Initialisation
     mu0 = [0]*21
     sigma0 = np.diag([100]*21)
@@ -28,20 +35,13 @@ def simulation_CE_const_noise(alpha, N_iteration,rho,noise): #alpha : taux d'act
         # Create the distribution
         distribution = stats.multivariate_normal(parameters[t-1][0], parameters[t-1][1])
         
-
         # Evaluate each parameter pool
         N = 100
-        sample_list = []
-        sample_score= []
+        sample_list = [distribution.rvs() for _ in range(N)]
 
-        for i in range(N):
-            
-            sample = distribution.rvs() #vecteur de paramètre W
-            
-
-            sample_score.append(Tetris.simulation(sample))
-            sample_list.append(sample)
-            
+        # Using multiprocessing to evaluate samples in parallel
+        with mp.Pool(processes=n_processes) as pool:
+            sample_score = pool.map(evaluate_sample, sample_list)
 
         # Keeping the rho*N bests vectors
         k=math.floor(N*rho)
@@ -67,10 +67,9 @@ def simulation_CE_const_noise(alpha, N_iteration,rho,noise): #alpha : taux d'act
         parameters.append((alpha * np.array(res[0]) + (1 - alpha) * np.array(parameters[-1][0]),
                         alpha ** 2 * np.array(res[1]) + (1 - alpha) ** 2 * np.array(parameters[-1][1])+matrix_noise))    
 
- #calcul de la moyenne du meilleur vecteur sur 30 parties
-        L_mean=[sample_score[indices[0]]] #liste des scores des 30 simulations
-        for k in range (29):
-            L_mean.append(Tetris.simulation(best_sample))
+        # Run 30 simulations in parallel with the best sample
+        with mp.Pool(processes=n_processes) as pool:
+            L_mean = pool.map(evaluate_sample, [best_sample for _ in range(30)])
 
         # Avg score of 30 simulations using the 1st best-scoring vector of the current generation
         print(np.mean(L_mean))
