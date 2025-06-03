@@ -4,6 +4,7 @@ import numpy as np
 from scipy import stats
 from scipy.optimize import minimize
 import Tetris
+from tqdm import tqdm
 
 
 def simulation_CE_const_noise(alpha, N_iteration,rho,noise): #alpha : taux d'actualistion 
@@ -21,7 +22,7 @@ def simulation_CE_const_noise(alpha, N_iteration,rho,noise): #alpha : taux d'act
     L_plot=[]
     L_norm=[]
 
-    for j in range (N_iteration):
+    for j in tqdm(range(N_iteration)):
 
 
         # Create the distribution
@@ -52,8 +53,9 @@ def simulation_CE_const_noise(alpha, N_iteration,rho,noise): #alpha : taux d'act
 
         # New parameter estimation using MLE
 
+        # Element-wise addition of vectors, then element-wise division by the number of vectors
+        mean = np.mean(sample_high, axis = 0) # Avg of best vectors
 
-        mean = np.mean(sample_high, axis = 0)
         cov =  np.cov(sample_high, rowvar = False)
         res = (mean, cov)
 
@@ -70,6 +72,7 @@ def simulation_CE_const_noise(alpha, N_iteration,rho,noise): #alpha : taux d'act
         for k in range (29):
             L_mean.append(Tetris.simulation(best_sample))
 
+        # Avg score of 30 simulations using the 1st best-scoring vector of the current generation
         print(np.mean(L_mean))
         L_plot.append(L_mean)
         t+=1
