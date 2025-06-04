@@ -6,7 +6,7 @@ authors = [
     {name = "James Sue-Ling",email = "james_sueling@hotmail.co.uk"}
 ]
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.10"
 dependencies = [
     "numpy (>=2.2.6,<3.0.0)",
     "scipy (>=1.15.3,<2.0.0)",

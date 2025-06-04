@@ -4,8 +4,8 @@ import tetris_env
 
 def main():
     # Parameters
-    alpha = 0.8  # Learning rate
-    N_iteration = 100  # Number of iterations
+    alpha = 1  # Learning rate
+    N_iteration = 100000  # Number of iterations
     rho = 0.1  # Fraction of vectors that are selected for the next iteration
     noise = 4  # Constant noise to add
 

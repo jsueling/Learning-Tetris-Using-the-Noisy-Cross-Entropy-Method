@@ -1,5 +1,6 @@
 import multiprocessing as mp
 import math
+import os
 
 import numpy as np
 from scipy import stats
@@ -26,15 +27,17 @@ def simulation_CE_const_noise(alpha, N_iteration,rho,noise, n_processes=None): #
     sigma0 = np.diag([100] * weight_vector_size)
     V0 = (mu0, sigma0)
     parameters = [V0]
-    t = 1
 
-    L_plot = []
+    # L_plot = []
 
-    for _ in tqdm(range(N_iteration)):
+    highest_avg_score = -np.inf # Track best performing sample across iterations
+    os.makedirs('./out', exist_ok=True)  # Ensure output directory exists
+
+    for i in tqdm(range(N_iteration)):
 
 
         # Create the distribution
-        distribution = stats.multivariate_normal(parameters[t-1][0], parameters[t-1][1])
+        distribution = stats.multivariate_normal(parameters[i][0], parameters[i][1])
 
         # Evaluate each parameter pool
         N = 100
@@ -47,8 +50,8 @@ def simulation_CE_const_noise(alpha, N_iteration,rho,noise, n_processes=None): #
         # Keeping the rho*N bests vectors
         k=math.floor(N*rho)
 
-        indices=sorted(range(len(sample_score)), key=lambda i: sample_score[i], reverse=True)[:k]
-        sample_high = [sample_list[i] for i in indices]
+        indices=sorted(range(len(sample_score)), key=lambda x: sample_score[x], reverse=True)[:k]
+        sample_high = [sample_list[x] for x in indices]
         best_sample=sample_list[indices[0]]
 
 
@@ -73,15 +76,29 @@ def simulation_CE_const_noise(alpha, N_iteration,rho,noise, n_processes=None): #
             L_mean = pool.map(evaluate_sample, [best_sample for _ in range(30)])
 
         # Avg score of 30 simulations using the 1st best-scoring vector of the current generation
-        print(np.mean(L_mean))
-        L_plot.append(L_mean)
-        t += 1
+        avg_score_best_sample = np.mean(L_mean)
+        # print(avg_score_best_sample)
+
+        if avg_score_best_sample > highest_avg_score:
+
+            highest_avg_score = avg_score_best_sample
+
+            best_data = {
+                'sample': best_sample,
+                'score': highest_avg_score,
+                'iteration': i+1
+            }
+
+            np.save('./out/best_sample_with_metadata.npy', best_data)
+
+        # L_plot.append(L_mean)
+
         # L_plot is a list of lists containing the scores of the 30 simulations
         # of the best performing vector for each iteration
         # mean is an element-wise avg of the best sample vectors in the current iteration
-        print(L_plot, mean)
+        # print(L_plot, mean)
 
-    return L_plot, mean
+    # return L_plot, mean
 
 
 
