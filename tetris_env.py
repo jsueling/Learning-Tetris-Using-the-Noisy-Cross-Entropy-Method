@@ -1,9 +1,11 @@
-import numpy as np
 import random
-import copy 
+import copy
+
+import numpy as np
 import matplotlib.pyplot as plt
 import imageio
 
+from BCTS import evaluate_BCTS
 
 class Figure:
     x = 0
@@ -49,6 +51,8 @@ class Tetris:
         self.field = np.zeros((height, width), dtype=int)
         self.score = 0
         self.state = "start"
+        # number of lines broken by the last Tetromino placement
+        self.broken_lines = 0
 
     def new_figure(self,fig_type,x,y,rotation):
         self.figure = Figure(x, y,fig_type,rotation) #introduction d'une nouvelle figure type en (x,y) 
@@ -67,27 +71,31 @@ class Tetris:
 
 
 
-    def break_lines(self): #checking and detroying full lines
-        lines = 0
+    def break_lines(self):
+        """Check for completed rows, remove them by shifting down all rows above."""
+        broken_lines = 0
         for i in range(1, self.height):
             zeros = 0
             for j in range(self.width):
                 if self.field[i][j] == 0:
                     zeros += 1
             if zeros == 0:
-                lines += 1
+                broken_lines += 1
                 for i1 in range(i, 1, -1):
                     for j in range(self.width):
                         self.field[i1][j] = self.field[i1 - 1][j]
-        self.score += lines #** 2 -- remove Tetris line-clear bonus for now
+        self.score += broken_lines #** 2 -- remove Tetris line-clear bonus for now
+        self.broken_lines = broken_lines
 
-    def hard_drop(self,color): #descend la pièce jusqu'en bas 
+    def hard_drop(self,color):
+        """Move the current figure directly down to the bottom of the field."""
         while not self.intersects():
             self.figure.y += 1
         self.figure.y -= 1
         self.freeze(color)
 
-    def freeze(self,color): #If it moves down and intersects, then this means we have reached the bottom, so we need to “freeze” the figure on our field:
+    def freeze(self,color):
+        """Freeze the current figure, it now becomes part of the field."""
         for i in range(4):
             for j in range(4):
                 if i * 4 + j in self.figure.image():
@@ -97,19 +105,20 @@ class Tetris:
 #Features du jeu 
 #retourne la taille des 10 colonnes du jeu 
 def column_height(field): #from top to bottom
-    h=[]
+    """Returns the height of each column in the grid as a list."""
+    h = []
     for j in range(10):
-        column=[field[i][j] for i in range(20)] 
-        height=0
+        column = [field[i][j] for i in range(20)]
+        height = 0 # height is a pointer counting contiguous empty cells
 
-        while height<20 and column[height]==0 :
-            height+=1
+        while height < 20 and column[height] == 0:
+            height += 1
 
-        h.append(20-height)
+        h.append(20 - height)
 
-    return(h)
+    return h
 
-#retourne la taille maximale des colonnes du jeu 
+#retourne la taille maximale des colonnes du jeu
 def maximum_height(field):
     return(max(column_height(field)))
 
@@ -136,7 +145,8 @@ def holes(field):
 
 
 #Evalue la configuration de la grille en pondérant les features par le vecteur W de taille 21
-def evaluate(W, field): 
+def evaluate_Bertsekas(W, field):
+    """Evaluate the Tetris grid using Bertsekas and Tsitsiklis' feature set."""
     #W=[w1, ..., w21] vector of parameters to tune 
 
     h=column_height(field)
@@ -158,76 +168,85 @@ def evaluate(W, field):
 
     return(S1+S2+S3+S4)
 
-#pour une configuration et une nouvelle piece donné, retourne le meilleur coup au sens de evaluate()
-def evaluate_best_move(W,field,fig_type,color):
-    L=[]
-    score=[]
-    for k in range (4):
+def evaluate_best_move(W, field, fig_type, color):
+    """Evaluates the best Tetromino placement"""
+    L = []
+    score = []
+    for k in range(4):
         for col in range(10):
-        
-            game_copy=Tetris(20,10)
-            
-            game_copy.field=copy.deepcopy(field)
+
+            game_copy = Tetris(20, 10)
+
+            game_copy.field = copy.deepcopy(field)
 
             # Try to place Tetromino at (col, 0) with rotation k
-            game_copy.new_figure(fig_type,col,0,k)
+            game_copy.new_figure(fig_type, col, 0, k)
 
             if game_copy.intersects():
                 continue
 
             game_copy.hard_drop(color)
-            score.append(evaluate(W,game_copy.field))
-            L.append([col,k])
 
-    if len(L)>0:
-        best_move=score.index(min(score))
-        return(L[best_move])
-    else : 
-        return([0,0])
+            score.append(evaluate_BCTS(W, game_copy))
+            L.append([col, k])
 
-#simule une partie 
+    if len(L) > 0:
+        best_move = score.index(min(score))
+        return L[best_move]
+
+    # If no valid moves are found, return a default move
+    return [0, 0]
+
+#simule une partie
 def simulation(W):
+    """
+    Simulates a Tetris game with the given weight vector W for its evaluation function.
+    """
 
     game = Tetris(20, 10)
-    while game.state!="gameover":
+    while game.state != "gameover":
 
-        fig_type=random.randint(0,6)
-        color=1
-        
+        fig_type = random.randint(0, 6)
+        color = 1
+
         # Evaluates all possible columns and rotations for the current Tetromino
-        col, rot = evaluate_best_move(W,game.field,fig_type,color)
+        col, rot = evaluate_best_move(W, game.field, fig_type, color)
 
         # Attempt to place the Tetromino in the best column and rotation
-        game.new_figure(fig_type,col,0,rot)
-        
+        game.new_figure(fig_type, col, 0, rot)
+
         # Check since evaluate_best_move may return (col, rot) that is already occupied
         if game.intersects():
-            game.state="gameover"
+            game.state = "gameover"
         else:
             game.hard_drop(color)
 
-    return(game.score)
+    return game.score
 
-def simulation_gif(W): #Pas encore optimisé pour les pièces qui arrivent en haut
+def simulation_gif(W, num_moves=100): #Pas encore optimisé pour les pièces qui arrivent en haut
+    """
+    Simulates a Tetris game with the given weight vector W for its evaluation function
+    and saves the frames as a GIF
+    """
 
     with imageio.get_writer('tetris.gif', mode='I') as writer:
 
         game = Tetris(20, 10)
 
-        while game.state!="gameover":
+        for _ in range(num_moves):
 
-            fig_type=random.randint(0,6)
-            color=random.randint(1,4)
+            fig_type = random.randint(0, 6)
+            color = random.randint(1, 4)
 
-            col, rot = evaluate_best_move(W,game.field,fig_type,color)
+            col, rot = evaluate_best_move(W, game.field, fig_type, color)
 
-            game.new_figure(fig_type,col,0,rot)
+            game.new_figure(fig_type, col, 0, rot)
 
             if game.intersects():
-                game.state="gameover"
-            else:
-                game.hard_drop(color)
-            
+                break
+
+            game.hard_drop(color)
+
             fig, ax = plt.subplots()
             ax.set_title(str(game.score))
             ax.matshow(game.field, cmap='Blues')
