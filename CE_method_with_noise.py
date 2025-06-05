@@ -60,7 +60,11 @@ def simulation_CE_const_noise(alpha, N_iteration,rho,noise, n_processes=None): #
         # Element-wise addition of vectors, then element-wise division by the number of vectors
         mean = np.mean(sample_high, axis = 0) # Avg of best vectors
 
+        # Among the best samples, captures individual feature spread on diagonal
+        # and inter-feature relationships on the off-diagonal.
         cov =  np.cov(sample_high, rowvar = False)
+        # The next iteration of samples are drawn from a distribution
+        # defined by the mean and covariance of the best samples.
         res = (mean, cov)
 
 

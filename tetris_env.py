@@ -223,13 +223,54 @@ def simulation(W):
 
     return game.score
 
+def simulation_data_collection(W, max_samples=1000, sample_freq=10):
+    """
+    Simulates a Tetris game with the given weight vector W for its evaluation function
+    and returns sample grids (concatenation of flattened grid and one-hot encoded piece).
+    """
+
+    game = Tetris(20, 10)
+    samples = []
+
+    move_counter = 0
+    while len(samples) < max_samples:
+
+        fig_type = random.randint(0, 6)
+
+        color = 1
+
+        col, rot = evaluate_best_move(W, game.field, fig_type, color)
+
+        game.new_figure(fig_type, col, 0, rot)
+
+        if game.intersects():
+            break
+
+        game.hard_drop(color)
+
+        if move_counter > 0 and move_counter % sample_freq == 0:
+
+            grid_features = game.field.flatten()
+
+            # One-hot encode current piece (7 possible pieces)
+            piece_features = np.zeros(7)
+            piece_features[fig_type] = 1
+
+            # Combine features
+            sample = np.concatenate([grid_features, piece_features])
+            samples.append(sample)
+
+        move_counter += 1
+
+    return samples
+
 def simulation_gif(W, num_moves=100): #Pas encore optimisé pour les pièces qui arrivent en haut
     """
     Simulates a Tetris game with the given weight vector W for its evaluation function
     and saves the frames as a GIF
     """
 
-    with imageio.get_writer('tetris.gif', mode='I') as writer:
+    with imageio.get_writer('tetris.gif', mode='I', fps=50) as writer:
 
         game = Tetris(20, 10)
 
@@ -249,7 +290,7 @@ def simulation_gif(W, num_moves=100): #Pas encore optimisé pour les pièces qui
 
             fig, ax = plt.subplots()
             ax.set_title(str(game.score))
-            ax.matshow(game.field, cmap='Blues')
+            ax.matshow(game.field, cmap='Reds')
             fig.canvas.draw()
             image = imageio.core.asarray(fig.canvas.renderer.buffer_rgba())
             writer.append_data(image)
