@@ -30,7 +30,7 @@ def simulation_CE_const_noise(alpha, N_iteration,rho,noise, n_processes=None): #
 
     # L_plot = []
 
-    highest_avg_score = -np.inf # Track best performing sample across iterations
+    best_score_elite_mean = -np.inf
     os.makedirs('./out', exist_ok=True)  # Ensure output directory exists
 
     for i in tqdm(range(N_iteration)):
@@ -50,25 +50,23 @@ def simulation_CE_const_noise(alpha, N_iteration,rho,noise, n_processes=None): #
         # Keeping the rho*N bests vectors
         k=math.floor(N*rho)
 
-        indices=sorted(range(len(sample_score)), key=lambda x: sample_score[x], reverse=True)[:k]
-        sample_high = [sample_list[x] for x in indices]
-        best_sample=sample_list[indices[0]]
+        indices=sorted(range(N), key=lambda x: sample_score[x], reverse=True)[:k]
 
+        sample_high = [sample_list[x] for x in indices]
 
         # New parameter estimation using MLE
 
-        # Element-wise addition of vectors, then element-wise division by the number of vectors
-        mean = np.mean(sample_high, axis = 0) # Avg of best vectors
+        elite_mean_vector = np.mean(sample_high, axis=0)
 
         # Among the best samples, captures individual feature spread on diagonal
         # and inter-feature relationships on the off-diagonal.
-        cov =  np.cov(sample_high, rowvar = False)
+        cov = np.cov(sample_high, rowvar=False)
+
         # The next iteration of samples are drawn from a distribution
         # defined by the mean and covariance of the best samples.
-        res = (mean, cov)
+        res = (elite_mean_vector, cov)
 
-
-        #add noise
+        # Add noise
 
         matrix_noise = np.diag([noise] * weight_vector_size)
 
@@ -77,23 +75,22 @@ def simulation_CE_const_noise(alpha, N_iteration,rho,noise, n_processes=None): #
 
         # Run 30 simulations in parallel with the best sample
         with mp.Pool(processes=n_processes) as pool:
-            L_mean = pool.map(evaluate_sample, [best_sample for _ in range(30)])
+            L_mean = pool.map(evaluate_sample, [elite_mean_vector for _ in range(30)])
 
-        # Avg score of 30 simulations using the 1st best-scoring vector of the current generation
-        avg_score_best_sample = np.mean(L_mean)
-        # print(avg_score_best_sample)
+        # Avg score of 30 Tetris simulations using elite mean vector of the current generation
+        avg_score_elite_mean = np.mean(L_mean)
 
-        if avg_score_best_sample > highest_avg_score:
+        if avg_score_elite_mean > best_score_elite_mean:
 
-            highest_avg_score = avg_score_best_sample
+            best_score_elite_mean = avg_score_elite_mean
 
             best_data = {
-                'sample': best_sample,
-                'score': highest_avg_score,
+                'best_elite_vector': elite_mean_vector,
+                'score': avg_score_elite_mean,
                 'iteration': i+1
             }
 
-            np.save('./out/best_sample_with_metadata.npy', best_data)
+            np.save('./out/best_elite_vector_data.npy', best_data)
 
         # L_plot.append(L_mean)
 

@@ -70,8 +70,8 @@ class Tetris:
         self.field = np.zeros((height, width), dtype=int)
         self.score = 0
         self.state = "start"
-        # number of lines broken by the last Tetromino placement
-        self.broken_lines = 0
+        # indices of rows broken by the last Tetromino placement
+        self.broken_line_indices = []
 
     def new_figure(self,fig_type,x,y,rotation):
         self.figure = Figure(x, y,fig_type,rotation) #introduction d'une nouvelle figure type en (x,y) 
@@ -104,7 +104,7 @@ class Tetris:
             # Add new lines at the top
             for _ in lines_to_clear:
                 self.field = np.insert(self.field, 0, [0 for _ in range(self.width)], axis=0)
-            self.broken_lines = broken_lines
+            self.broken_line_indices = lines_to_clear
             self.score += broken_lines #** 2 -- remove Tetris line-clear bonus for now
 
     def hard_drop(self,color):

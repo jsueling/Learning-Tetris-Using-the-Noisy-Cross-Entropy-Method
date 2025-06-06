@@ -50,10 +50,17 @@ def landing_height(game):
 
 def eroded_piece_cells(game):
     """
-    Returns the number of cells eroded by the
-    Tetromino placement leading to this configuration.
+    (Number of rows eliminated in the last
+    move) * (Number of bricks eliminated
+    from the last piece added)
     """
-    return game.broken_lines * game.width
+    bricks_eliminated_from_last_piece_added = 0
+    for cell_index in game.figure.image(): # Tetromino just placed
+        row_offset = cell_index // 4
+        row_index = game.figure.y + row_offset
+        if row_index in game.broken_line_indices: # lines broken by the last piece
+            bricks_eliminated_from_last_piece_added += 1
+    return len(game.broken_line_indices) * bricks_eliminated_from_last_piece_added
 
 def row_transitions(game):
     """
