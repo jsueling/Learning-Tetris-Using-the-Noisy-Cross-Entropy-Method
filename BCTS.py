@@ -38,8 +38,8 @@ def rows_with_holes(game):
 
 def landing_height(game):
     """
-    Calculates landing height which is the row where the Tetromino's lowest
-    filled cell will land after a hard drop.
+    Calculates landing height which is the row of the lowest
+    filled cell of the last placed Tetromino leading to this grid configuration
     """
     fig = game.figure
     row = fig.y
