@@ -141,15 +141,14 @@ class Tetris:
 #Features du jeu
 #retourne la taille des 10 colonnes du jeu
 def column_height(field): #from top to bottom
-    """Returns the height of each column in the grid as a list."""
+    """Returns the height of each column in the grid in order as a list."""
     h = []
-    for j in range(10):
-        column = [field[i][j] for i in range(20)]
-        empty_cell_pointer = 0 # contiguous empty cells
-        while empty_cell_pointer < 20 and column[empty_cell_pointer] == 0:
-            empty_cell_pointer += 1
-        height_column_j = 20 - empty_cell_pointer
-        h.append(height_column_j)
+    for col in range(len(field[0])):
+        row_pointer = 0 # pointer to contiguous empty cells in the column
+        while row_pointer < len(field) and field[row_pointer][col] == 0:
+            row_pointer += 1
+        col_height = len(field) - row_pointer
+        h.append(col_height)
     return h
 
 #retourne la taille maximale des colonnes du jeu
