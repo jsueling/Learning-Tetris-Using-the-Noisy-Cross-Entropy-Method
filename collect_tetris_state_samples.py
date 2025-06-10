@@ -16,7 +16,7 @@ def collect_single_batch(_):
     """
     return tetris_env.simulation_data_collection(BEST_BCTS_WEIGHT_VECTOR)
 
-def collect_grid_samples():
+def collect_state_samples():
     """
     Collects sample data (flattened grid + one-hot encoded piece)
     from Tetris simulations using multiprocessing.
@@ -40,11 +40,11 @@ def collect_grid_samples():
                 all_samples.append(single_grid_sample)
 
         if len(all_samples) > 5000:
-            np.save(f'./out/vae_samples_batch_{iteration_number}.npy', np.array(all_samples))
+            np.save(f'./out/tetris_state_samples_batch_{iteration_number}.npy', all_samples)
             all_samples = []  # Clear memory
             save_counter += 1
 
         iteration_number += 1
 
 if __name__ == "__main__":
-    collect_grid_samples()
+    collect_state_samples()

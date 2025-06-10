@@ -207,15 +207,6 @@ def evaluate_best_move(W, field, fig_type, color):
     Evaluates all valid placements and returns the best column and rotation.
     """
 
-    # Base case: if the field is full, return invalid move
-    default_col, default_rot = Figure.default_spawns[fig_type]
-    game_copy = Tetris(20, 10)
-    game_copy.field = copy.deepcopy(field)
-    game_copy.new_figure(fig_type, default_col, 0, default_rot)
-    # ending the game
-    if game_copy.intersects():
-        return [100, 0]
-
     L = []
     score = []
     for rotation in range(4):
@@ -225,18 +216,7 @@ def evaluate_best_move(W, field, fig_type, color):
 
             game_copy.field = copy.deepcopy(field)
 
-            # Spawn the Tetromino in the default position
-            default_col, default_rotation = Figure.default_spawns[fig_type]
-            game_copy.new_figure(fig_type, default_col, 0, default_rotation)
-
-            # A sequence of moves from default position to the target
-            # column must exist
-            if not game_copy.path_exists_to_col(col):
-                continue
-
-            # Move the Tetromino to the target column and rotation
-            game_copy.figure.x = col
-            game_copy.figure.rotation = rotation
+            game_copy.new_figure(fig_type, col, 0, rotation)
 
             # Checks if target rotation is valid at the target column
             if game_copy.intersects():
@@ -306,16 +286,8 @@ def simulation_data_collection(W, max_samples=1000, sample_freq=10):
         game.hard_drop(color)
 
         if move_counter > 0 and move_counter % sample_freq == 0:
-
-            grid_features = game.field.flatten()
-
-            # One-hot encode current piece (7 possible pieces)
-            piece_features = np.zeros(7)
-            piece_features[fig_type] = 1
-
-            # Combine features
-            sample = np.concatenate([grid_features, piece_features])
-            samples.append(sample)
+            # 200 binary features for the grid (20x10 flattened)
+            samples.append(game.field.flatten())
 
         move_counter += 1
 
