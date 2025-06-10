@@ -8,10 +8,13 @@ import imageio
 from BCTS import evaluate_BCTS
 
 class Figure:
+    """Represents a Tetromino with its position, type, and rotation."""
     x = 0
     y = 0
-#liste des 6 différentes figures et leur rotation
-    figures = [ 
+    # liste des 6 différentes figures et leur rotation
+    figures = [
+        # Each figure is represented by a flattened 4x4 dimension
+        # with a list of each 4 rotations it can take
         [[0, 4, 8, 12], [0, 1, 2, 3], [0, 4, 8, 12], [0, 1, 2, 3]], # I
         [[0, 1, 5, 6], [1, 4, 5, 8], [0, 1, 5, 6], [1, 4, 5, 8]], # Z
         [[4, 5, 1, 2], [0, 4, 5, 9], [4, 5, 1, 2], [0, 4, 5, 9]], # S
@@ -19,6 +22,18 @@ class Figure:
         [[0, 1, 5, 9], [4, 0, 1, 2], [0, 4, 8, 9], [4, 5, 6, 2]], # L
         [[1, 4, 5, 6], [1, 4, 5, 9], [0, 1, 2, 5], [0, 4, 8, 5]], # T
         [[0, 1, 4, 5], [0, 1, 4, 5], [0, 1, 4, 5], [0, 1, 4, 5]], # O
+    ]
+
+    default_spawns = [
+        # Default spawns are horizontally centered along the top row
+        # format: column, rotation
+        [3, 1],  # I
+        [3, 0],  # Z
+        [3, 0],  # S
+        [3, 3],  # J
+        [3, 1],  # L
+        [3, 2],  # T
+        [4, 0],  # O
     ]
 
     # Each Figure's position is represented by
@@ -43,6 +58,10 @@ class Figure:
         return self.figures[self.type][self.rotation]
 
 class Tetris:
+    """
+    Represents the Tetris game state,
+    including the field, current figure, score, and game state.
+    """
     def __init__(self, height, width): #initialisation du jeu 
 
         self.figure = None
@@ -51,8 +70,8 @@ class Tetris:
         self.field = np.zeros((height, width), dtype=int)
         self.score = 0
         self.state = "start"
-        # number of lines broken by the last Tetromino placement
-        self.broken_lines = 0
+        # indices of rows broken by the last Tetromino placement
+        self.broken_line_indices = []
 
     def new_figure(self,fig_type,x,y,rotation):
         self.figure = Figure(x, y,fig_type,rotation) #introduction d'une nouvelle figure type en (x,y) 
@@ -72,20 +91,21 @@ class Tetris:
 
 
     def break_lines(self):
-        """Check for completed rows, remove them by shifting down all rows above."""
-        broken_lines = 0
-        for i in range(1, self.height):
-            zeros = 0
-            for j in range(self.width):
-                if self.field[i][j] == 0:
-                    zeros += 1
-            if zeros == 0:
-                broken_lines += 1
-                for i1 in range(i, 1, -1):
-                    for j in range(self.width):
-                        self.field[i1][j] = self.field[i1 - 1][j]
-        self.score += broken_lines #** 2 -- remove Tetris line-clear bonus for now
-        self.broken_lines = broken_lines
+        """Break lines that are completely filled by Tetrominoes."""
+
+        # credits to https://github.com/nuno-faria/tetris-ai/blob/master/tetris.py#L161
+        lines_to_clear = [index for index, row in enumerate(self.field) if all(row > 0)]
+        broken_lines = len(lines_to_clear)
+        if broken_lines > 0:
+            self.field = np.array([
+                self.field[row_index] for row_index in range(self.height)
+                if row_index not in lines_to_clear
+            ])
+            # Add new lines at the top
+            for _ in lines_to_clear:
+                self.field = np.insert(self.field, 0, [0 for _ in range(self.width)], axis=0)
+            self.broken_line_indices = lines_to_clear
+            self.score += broken_lines #** 2 -- remove Tetris line-clear bonus for now
 
     def hard_drop(self,color):
         """Move the current figure directly down to the bottom of the field."""
@@ -102,20 +122,33 @@ class Tetris:
                     self.field[i + self.figure.y][j + self.figure.x] = color
         self.break_lines()
 
-#Features du jeu 
-#retourne la taille des 10 colonnes du jeu 
+    def path_exists_to_col(self, target_column):
+        """
+        Check if there is a valid path across the top row to the desired column
+        for the Tetromino hard drop placement. This assumes that
+        all shifts and rotations are possible during lock delay.
+        """
+        if target_column < self.figure.x:
+            for col in range(self.figure.x, target_column - 1, -1):
+                if self.field[0][col] > 0 or self.field[1][col] > 0:
+                    return False
+        elif target_column > self.figure.x:
+            for col in range(self.figure.x, target_column + 1):
+                if self.field[0][col] > 0 or self.field[1][col] > 0:
+                    return False
+        return True
+
+#Features du jeu
+#retourne la taille des 10 colonnes du jeu
 def column_height(field): #from top to bottom
-    """Returns the height of each column in the grid as a list."""
+    """Returns the height of each column in the grid in order as a list."""
     h = []
-    for j in range(10):
-        column = [field[i][j] for i in range(20)]
-        height = 0 # height is a pointer counting contiguous empty cells
-
-        while height < 20 and column[height] == 0:
-            height += 1
-
-        h.append(20 - height)
-
+    for col in range(len(field[0])):
+        row_pointer = 0 # pointer to contiguous empty cells in the column
+        while row_pointer < len(field) and field[row_pointer][col] == 0:
+            row_pointer += 1
+        col_height = len(field) - row_pointer
+        h.append(col_height)
     return h
 
 #retourne la taille maximale des colonnes du jeu
@@ -169,38 +202,42 @@ def evaluate_Bertsekas(W, field):
     return(S1+S2+S3+S4)
 
 def evaluate_best_move(W, field, fig_type, color):
-    """Evaluates the best Tetromino placement"""
+    """
+    Evaluates all valid placements and returns the best column and rotation.
+    """
+
     L = []
     score = []
-    for k in range(4):
+    for rotation in range(4):
         for col in range(10):
 
             game_copy = Tetris(20, 10)
 
             game_copy.field = copy.deepcopy(field)
 
-            # Try to place Tetromino at (col, 0) with rotation k
-            game_copy.new_figure(fig_type, col, 0, k)
+            game_copy.new_figure(fig_type, col, 0, rotation)
 
+            # Checks if target rotation is valid at the target column
             if game_copy.intersects():
                 continue
 
             game_copy.hard_drop(color)
 
             score.append(evaluate_BCTS(W, game_copy))
-            L.append([col, k])
+            L.append([col, rotation])
 
     if len(L) > 0:
         best_move = score.index(min(score))
         return L[best_move]
 
-    # If no valid moves are found, return a default move
-    return [0, 0]
+    # If no valid moves are found, return invalid move since the game is over
+    return [100, 0]
 
 #simule une partie
 def simulation(W):
     """
     Simulates a Tetris game with the given weight vector W for its evaluation function.
+    returns the final score of the game.
     """
 
     game = Tetris(20, 10)
@@ -210,12 +247,11 @@ def simulation(W):
         color = 1
 
         # Evaluates all possible columns and rotations for the current Tetromino
-        col, rot = evaluate_best_move(W, game.field, fig_type, color)
+        col, rotation = evaluate_best_move(W, game.field, fig_type, color)
 
         # Attempt to place the Tetromino in the best column and rotation
-        game.new_figure(fig_type, col, 0, rot)
-
-        # Check since evaluate_best_move may return (col, rot) that is already occupied
+        game.new_figure(fig_type, col, 0, rotation)
+        # evaluate_best_move may return invalid moves
         if game.intersects():
             game.state = "gameover"
         else:
@@ -239,9 +275,9 @@ def simulation_data_collection(W, max_samples=1000, sample_freq=10):
 
         color = 1
 
-        col, rot = evaluate_best_move(W, game.field, fig_type, color)
+        col, rotation = evaluate_best_move(W, game.field, fig_type, color)
 
-        game.new_figure(fig_type, col, 0, rot)
+        game.new_figure(fig_type, col, 0, rotation)
 
         if game.intersects():
             break
@@ -249,16 +285,8 @@ def simulation_data_collection(W, max_samples=1000, sample_freq=10):
         game.hard_drop(color)
 
         if move_counter > 0 and move_counter % sample_freq == 0:
-
-            grid_features = game.field.flatten()
-
-            # One-hot encode current piece (7 possible pieces)
-            piece_features = np.zeros(7)
-            piece_features[fig_type] = 1
-
-            # Combine features
-            sample = np.concatenate([grid_features, piece_features])
-            samples.append(sample)
+            # 200 binary features for the grid (20x10 flattened)
+            samples.append(game.field.flatten())
 
         move_counter += 1
 
@@ -279,9 +307,9 @@ def simulation_gif(W, num_moves=100): #Pas encore optimisé pour les pièces qui
             fig_type = random.randint(0, 6)
             color = random.randint(1, 4)
 
-            col, rot = evaluate_best_move(W, game.field, fig_type, color)
+            col, rotation = evaluate_best_move(W, game.field, fig_type, color)
 
-            game.new_figure(fig_type, col, 0, rot)
+            game.new_figure(fig_type, col, 0, rotation)
 
             if game.intersects():
                 break
