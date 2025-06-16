@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import imageio
 
-from BCTS import evaluate_BCTS
+from bcts_feature_set import evaluate_bcts
 
 class Figure:
     """Represents a Tetromino with its position, type, and rotation."""
@@ -138,75 +138,71 @@ class Tetris:
                     return False
         return True
 
-#Features du jeu
-#retourne la taille des 10 colonnes du jeu
-def column_height(field): #from top to bottom
+def get_column_heights(field):
     """Returns the height of each column in the grid in order as a list."""
-    h = []
-    for col in range(len(field[0])):
+    column_heights = []
+    for col in range(10):
         row_pointer = 0 # pointer to contiguous empty cells in the column
-        while row_pointer < len(field) and field[row_pointer][col] == 0:
+        while row_pointer < 20 and field[row_pointer][col] == 0:
             row_pointer += 1
-        col_height = len(field) - row_pointer
-        h.append(col_height)
-    return h
+        col_height = 20 - row_pointer
+        column_heights.append(col_height)
+    return column_heights
 
-#retourne la taille maximale des colonnes du jeu
-def maximum_height(field):
-    return(max(column_height(field)))
-
-#retourne la différence en valeur absolue de la taille d'une colonne avec celle de sa voisine 
-def column_difference(field):# absolute difference between adjacent columns
-    df=[]
-    h=column_height(field)
+def get_adj_col_height_diffs(field):
+    """Returns the absolute difference between all adjacent columns."""
+    adj_col_height_diffs = []
+    column_heights = get_column_heights(field)
 
     for j in range(9):
-        df.append(abs(h[j+1]-h[j]))
-    
-    return(df)
-#compte le nombre de troux inaccessibles du jeu 
-def holes(field):
-    L=0
-    h=column_height(field)
+        adj_col_height_diffs.append(abs(column_heights[j+1]-column_heights[j]))
 
-    for j in range(10):
-        for i in range(20-h[j],20):
-            if field[i][j]==0:
-                L+=1
-    
-    return(L)
+    return adj_col_height_diffs
 
+def count_holes(field):
+    """Count the number of inaccessible holes in the Tetris grid."""
+    hole_count = 0
+    column_heights = get_column_heights(field)
 
-#Evalue la configuration de la grille en pondérant les features par le vecteur W de taille 21
-def evaluate_Bertsekas(W, field):
+    for col_index in range(10):
+        for row_index in range(20-column_heights[col_index], 20):
+            if field[row_index][col_index] == 0:
+                hole_count += 1
+
+    return hole_count
+
+# Evalue la configuration de la grille en pondérant les features par le vecteur W de taille 21
+def evaluate_bertsekas(weight_vector, game):
     """Evaluate the Tetris grid using Bertsekas and Tsitsiklis' feature set."""
-    #W=[w1, ..., w21] vector of parameters to tune 
+    # weight_vector = [w1, ..., w21] vector of parameters to tune
 
-    h=column_height(field)
-    dh=column_difference(field)
-    L=holes(field)
-    H=maximum_height(field)
-    
-    S1,S2,S3,S4=0,0,0,0
+    field = game.field
 
-    for k in range (len(h)):
-        S1+=h[k]*W[k]
-    
-    for k in range (len(dh)):
-        S2+=dh[k]*W[10+k]
+    col_heights = get_column_heights(field)
+    adj_col_height_diffs = get_adj_col_height_diffs(field)
+    holes = count_holes(field)
+    max_col_height = max(col_heights)
 
-    S3=W[19]*L
+    score = 0
 
-    S4=W[20]*H
+    for col_index, height in enumerate(col_heights):
+        score += height * weight_vector[col_index]
 
-    return(S1+S2+S3+S4)
+    for col_index, diff in enumerate(adj_col_height_diffs):
+        score += diff * weight_vector[10 + col_index]
 
-def evaluate_best_move(W, field, fig_type, color):
+    score += weight_vector[19] * holes
+
+    score += weight_vector[20] * max_col_height
+
+    return score
+
+def evaluate_best_move(weight_vector, field, fig_type, color):
     """
     Evaluates all valid placements and returns the best column and rotation.
     """
 
-    L = []
+    candidate_moves = []
     score = []
     for rotation in range(4):
         for col in range(10):
@@ -223,18 +219,18 @@ def evaluate_best_move(W, field, fig_type, color):
 
             game_copy.hard_drop(color)
 
-            score.append(evaluate_BCTS(W, game_copy))
-            L.append([col, rotation])
+            score.append(evaluate_bcts(weight_vector, game_copy))
+            candidate_moves.append([col, rotation])
 
-    if len(L) > 0:
+    if len(candidate_moves) > 0:
         best_move = score.index(min(score))
-        return L[best_move]
+        return candidate_moves[best_move]
 
     # If no valid moves are found, return invalid move since the game is over
     return [100, 0]
 
 #simule une partie
-def simulation(W):
+def simulation(weight_vector):
     """
     Simulates a Tetris game with the given weight vector W for its evaluation function.
     returns the final score of the game.
@@ -247,7 +243,7 @@ def simulation(W):
         color = 1
 
         # Evaluates all possible columns and rotations for the current Tetromino
-        col, rotation = evaluate_best_move(W, game.field, fig_type, color)
+        col, rotation = evaluate_best_move(weight_vector, game.field, fig_type, color)
 
         # Attempt to place the Tetromino in the best column and rotation
         game.new_figure(fig_type, col, 0, rotation)
@@ -259,7 +255,7 @@ def simulation(W):
 
     return game.score
 
-def simulation_data_collection(W, max_samples=1000, sample_freq=10):
+def simulation_data_collection(weight_vector, max_samples=1000, sample_freq=10):
     """
     Simulates a Tetris game with the given weight vector W for its evaluation function
     and returns sample grids (concatenation of flattened grid and one-hot encoded piece).
@@ -275,7 +271,7 @@ def simulation_data_collection(W, max_samples=1000, sample_freq=10):
 
         color = 1
 
-        col, rotation = evaluate_best_move(W, game.field, fig_type, color)
+        col, rotation = evaluate_best_move(weight_vector, game.field, fig_type, color)
 
         game.new_figure(fig_type, col, 0, rotation)
 
@@ -292,7 +288,7 @@ def simulation_data_collection(W, max_samples=1000, sample_freq=10):
 
     return samples
 
-def simulation_gif(W, num_moves=100): #Pas encore optimisé pour les pièces qui arrivent en haut
+def simulation_gif(weight_vector, num_moves=100): #Pas encore optimisé pour les pièces qui arrivent en haut
     """
     Simulates a Tetris game with the given weight vector W for its evaluation function
     and saves the frames as a GIF
@@ -307,7 +303,7 @@ def simulation_gif(W, num_moves=100): #Pas encore optimisé pour les pièces qui
             fig_type = random.randint(0, 6)
             color = random.randint(1, 4)
 
-            col, rotation = evaluate_best_move(W, game.field, fig_type, color)
+            col, rotation = evaluate_best_move(weight_vector, game.field, fig_type, color)
 
             game.new_figure(fig_type, col, 0, rotation)
 

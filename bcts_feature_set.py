@@ -12,12 +12,12 @@ def hole_depth(game):
     of the pile: it is the sum of the number of full cells above
     each hole
     """
-    count=0
-    h=tetris_env.column_height(game.field)
+    count = 0
+    column_heights = tetris_env.get_column_heights(game.field)
     for c in range(game.width):
         full_cells_above = 0
-        for r in range(game.height-h[c], game.height):
-            if game.field[r][c]==0:
+        for r in range(game.height - column_heights[c], game.height):
+            if game.field[r][c] == 0:
                 count += full_cells_above
             else:
                 full_cells_above += 1
@@ -29,10 +29,10 @@ def rows_with_holes(game):
     (two holes on the same row count for only one)
     """
     rows_containing_holes = set()
-    h = tetris_env.column_height(game.field)
+    column_heights = tetris_env.get_column_heights(game.field)
     for c in range(game.width):
-        for r in range(game.height-h[c], game.height):
-            if game.field[r][c]==0 and r not in rows_containing_holes:
+        for r in range(game.height-column_heights[c], game.height):
+            if game.field[r][c] == 0 and r not in rows_containing_holes:
                 rows_containing_holes.add(r)
     return len(rows_containing_holes)
 
@@ -110,16 +110,16 @@ def board_wells(game):
         count += (well_depth * (well_depth + 1)) // 2
     return count
 
-def evaluate_BCTS(W, game):
-    """Evaluate the Tetris grid using Thiery and Scherrers' feature set."""
+def evaluate_bcts(weight_vector, game):
+    """Evaluate the Tetris grid using Thiery and Scherrers' BCTS feature set."""
 
-    S0 = W[0] * landing_height(game)
-    S1 = W[1] * eroded_piece_cells(game)
-    S2 = W[2] * row_transitions(game)
-    S3 = W[3] * col_transitions(game)
-    S4 = W[4] * tetris_env.holes(game.field)
-    S5 = W[5] * board_wells(game)
-    S6 = W[6] * hole_depth(game)
-    S7 = W[7] * rows_with_holes(game)
-
-    return S0 + S1 + S2 + S3 + S4 + S5 + S6 + S7
+    return sum([
+        weight_vector[0] * landing_height(game),
+        weight_vector[1] * eroded_piece_cells(game),
+        weight_vector[2] * row_transitions(game),
+        weight_vector[3] * col_transitions(game),
+        weight_vector[4] * tetris_env.count_holes(game.field),
+        weight_vector[5] * board_wells(game),
+        weight_vector[6] * hole_depth(game),
+        weight_vector[7] * rows_with_holes(game)
+    ])
