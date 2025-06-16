@@ -79,7 +79,7 @@ def simulation_CE_const_noise(
         # Select the top k indices
         top_k_indices = ranked_sample_indices[:k]
         # Select the top k elite vectors
-        elite_vectors = [sample_vectors[index] for index in top_k_indices]
+        elite_vectors = sample_vectors[top_k_indices]
 
         # New parameter estimation using MLE
 
@@ -156,6 +156,7 @@ def constant_noisy_cem_no_covariance(
 
     for iteration_index in tqdm(range(iteration_count)):
 
+        # Sample vectors from a univariate normal distribution
         sample_vectors = np.random.normal(
             loc=mean_prev,
             scale=np.sqrt(var_prev),
@@ -179,7 +180,7 @@ def constant_noisy_cem_no_covariance(
         # Select the top k indices
         top_k_indices = ranked_sample_indices[:k]
         # Select the top k elite vectors
-        elite_vectors = np.array([sample_vectors[index] for index in top_k_indices])
+        elite_vectors = sample_vectors[top_k_indices]
 
         # New parameter estimation using MLE
 
@@ -193,7 +194,7 @@ def constant_noisy_cem_no_covariance(
         mean_prev = mean_next
         var_prev = var_next
 
-        # Run 30 simulations in parallel with the best sample
+        # Run 30 simulations in parallel with the elite mean vector
         with mp.Pool(processes=n_processes) as pool:
             elite_vector_scores = pool.map(evaluate_sample, [elite_mean_vector for _ in range(30)])
 
