@@ -52,6 +52,8 @@ def simulation_CE_const_noise(
     # Create a constant noise matrix along the diagonal
     matrix_noise = np.diag([noise] * weight_vector_size)
 
+    elite_mean_avg_scores_log = []
+
     for iteration_index in tqdm(range(iteration_count)):
 
         # Create the distribution for this generation
@@ -114,6 +116,14 @@ def simulation_CE_const_noise(
 
             np.save('./out/best_elite_vector_data.npy', best_data)
 
+        elite_mean_avg_scores_log.append(avg_score_elite_mean)
+
+        # Overwrites each iteration, maintaining all previous scores in real time
+        np.save(
+            './out/simulation_CE_const_noise_scores.npy',
+            elite_mean_avg_scores_log
+        )
+
 def constant_noisy_cem_no_covariance(
         iteration_count,
         rho,
@@ -153,6 +163,8 @@ def constant_noisy_cem_no_covariance(
     # Create a constant noise vector to be added
     # to the variance of each feature at each iteration
     constant_noise = np.array([noise] * weight_vector_size)
+
+    elite_mean_avg_scores_log = []
 
     for iteration_index in tqdm(range(iteration_count)):
 
@@ -212,6 +224,13 @@ def constant_noisy_cem_no_covariance(
             }
 
             np.save('./out/best_elite_vector_data.npy', best_data)
+
+        elite_mean_avg_scores_log.append(avg_score_elite_mean)
+
+        np.save(
+            './out/constant_noisy_cem_no_covariance_scores.npy',
+            elite_mean_avg_scores_log
+        )
 
 def simulation_CE_deacr_noise(alpha, N_iteration,rho,a,b): #alpha : taux d'actualistion 
                                    #N_mean: nombre de simulation par vecteur
