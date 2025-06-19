@@ -62,7 +62,7 @@ class Tetris:
     Represents the Tetris game state,
     including the field, current figure, score, and game state.
     """
-    def __init__(self, height, width): #initialisation du jeu 
+    def __init__(self, height, width, tetromino_randomisation_scheme="uniform"): #initialisation du jeu
 
         self.figure = None
         self.height = height
@@ -73,8 +73,38 @@ class Tetris:
         # indices of rows broken by the last Tetromino placement
         self.broken_line_indices = []
 
+        # scheme can be type "uniform" or "bag"
+        self.tetromino_randomisation_scheme = tetromino_randomisation_scheme
+
+        if self.tetromino_randomisation_scheme == "bag":
+            # Initialise a bag of random Tetrominoes
+            self.bag = list(range(len(Figure.figures)))
+            random.shuffle(self.bag)
+
     def new_figure(self,fig_type,x,y,rotation):
         self.figure = Figure(x, y,fig_type,rotation) #introduction d'une nouvelle figure type en (x,y) 
+
+    def get_next_piece(self):
+        """
+        Returns the next piece type based on the randomisation scheme.
+        For "uniform", it returns a random piece type.
+        For "bag", it returns a piece type from a bag containing each
+        Tetromino in a random order, refilling and reshuffling it when empty.
+        """
+
+        if self.tetromino_randomisation_scheme == "uniform":
+            # Randomly select a piece type uniformly
+            return random.randint(0, 6)
+
+        if self.tetromino_randomisation_scheme == "bag":
+            if not self.bag:
+                self.bag = list(range(len(Figure.figures)))
+                random.shuffle(self.bag)
+            return self.bag.pop()
+
+        raise ValueError(
+            f"Invalid tetromino randomisation scheme: {self.tetromino_randomisation_scheme}"
+        )
 
     def intersects(self): #check if the currently flying figure intersecting with something fixed on the field. 
         intersection = False
@@ -239,7 +269,8 @@ def simulation(weight_vector):
     game = Tetris(20, 10)
     while game.state != "gameover":
 
-        fig_type = random.randint(0, 6)
+        fig_type = game.get_next_piece()
+
         color = 1
 
         # Evaluates all possible columns and rotations for the current Tetromino
@@ -267,7 +298,7 @@ def simulation_data_collection(weight_vector, max_samples=1000, sample_freq=10):
     move_counter = 0
     while len(samples) < max_samples:
 
-        fig_type = random.randint(0, 6)
+        fig_type = game.get_next_piece()
 
         color = 1
 
@@ -300,7 +331,7 @@ def simulation_gif(weight_vector, num_moves=100): #Pas encore optimisé pour les
 
         for _ in range(num_moves):
 
-            fig_type = random.randint(0, 6)
+            fig_type = game.get_next_piece()
             color = random.randint(1, 4)
 
             col, rotation = evaluate_best_move(weight_vector, game.field, fig_type, color)
