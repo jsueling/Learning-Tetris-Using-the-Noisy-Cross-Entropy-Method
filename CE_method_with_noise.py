@@ -1,6 +1,9 @@
+"""This module implements the Cross-Entropy Method (CEM) with constant noise"""
+
 import multiprocessing as mp
 import math
 import os
+import random
 
 import numpy as np
 from scipy import stats
@@ -8,21 +11,29 @@ from tqdm import tqdm
 
 import tetris_env
 
-def evaluate_sample(sample):
-    """Helper function to evaluate a single sample."""
-    return tetris_env.simulation(sample)
+def evaluate_sample(input_data):
+    """Helper function to evaluate a single sample in parallel."""
+    sample, seed, tetromino_randomisation_scheme = input_data
+    return tetris_env.simulation(
+        sample,
+        seed=seed, # Ensure reproducibility across separate processes
+        tetromino_randomisation_scheme=tetromino_randomisation_scheme
+    )
 
-def simulation_CE_const_noise(
+def constant_noisy_cem_multivariate(
         alpha,
         iteration_count,
         rho,
         noise,
         weight_vector_size=8,
-        n_processes=None
+        n_processes=None,
+        seed=None,
+        tetromino_randomisation_scheme=None
     ):
     """
     Optimises a weight vector which maximises Tetris score using 
-    the cross-entropy method with constant noise.
+    the cross-entropy method with constant noise. Samples vectors from a
+    multivariate normal distribution.
     Parameters:
     - alpha: Learning rate for the CMA-ES algorithm.
     - iteration_count: Number of iterations to run the simulation.
@@ -30,7 +41,18 @@ def simulation_CE_const_noise(
     - noise: Constant noise value to add to the covariance matrix.
     - weight_vector_size: Dependent on which feature set is used
     - n_processes: Number of processes to use for parallel evaluation
+    - seed: Seed randomness for reproducibility.
+    - tetromino_randomisation_scheme: Scheme for randomising tetromino generation.
     """
+
+    if tetromino_randomisation_scheme not in ["uniform", "bag"]:
+        raise ValueError("Tetromino randomisation scheme must be either 'uniform' or 'bag'.")
+    if seed is None:
+        raise ValueError("Seed must be provided for reproducibility.")
+
+    # Seed randomness in main loop
+    np.random.seed(seed)
+    random.seed(seed)
 
     if n_processes is None:
         n_processes = mp.cpu_count() - 1
@@ -64,9 +86,21 @@ def simulation_CE_const_noise(
 
         sample_vectors = distribution.rvs(size=n_sampled_vectors)
 
+        # Preprocess the vectors to include seed and tetromino randomisation scheme
+        # The seed is converted to base 100 to ensure uniqueness across iterations and samples
+        # The first set of samples have seed >= 1 million to avoid collisions with
+        # seeds used for evaluating the mean elite vector later in the loop
+        sample_vectors_mp_input = [
+            (
+                vector,
+                (seed+1) * (100 ** 3) + iteration_index * (100 ** 1) + sample_index * (100 ** 0),
+                tetromino_randomisation_scheme
+            ) for sample_index, vector in enumerate(sample_vectors)
+        ]
+
         # Using multiprocessing to evaluate samples in parallel
         with mp.Pool(processes=n_processes) as pool:
-            sample_evaluation_scores = pool.map(evaluate_sample, sample_vectors)
+            sample_evaluation_scores = pool.map(evaluate_sample, sample_vectors_mp_input)
 
         # Calculate the top k (rho * N) best vectors
         k = math.floor(n_sampled_vectors * rho)
@@ -97,9 +131,18 @@ def simulation_CE_const_noise(
         # Add constant noise
         cov_prev = (alpha ** 2 * cov_next + (1 - alpha) ** 2 * cov_prev) + matrix_noise
 
+        # Preprocess elite mean vector for parallel evaluation
+        elite_mean_vector_mp_input = [
+            (
+                elite_mean_vector,
+                seed * (100 ** 2) + iteration_index * (100 ** 1) + sample_index * (100 ** 0),
+                tetromino_randomisation_scheme
+            ) for sample_index in range(30)
+        ]
+
         # Run 30 simulations in parallel with the best sample
         with mp.Pool(processes=n_processes) as pool:
-            elite_vector_scores = pool.map(evaluate_sample, [elite_mean_vector for _ in range(30)])
+            elite_vector_scores = pool.map(evaluate_sample, elite_mean_vector_mp_input)
 
         # Avg score of 30 Tetris simulations using elite mean vector of the current generation
         avg_score_elite_mean = np.mean(elite_vector_scores)
@@ -114,36 +157,50 @@ def simulation_CE_const_noise(
                 'iteration': iteration_index + 1
             }
 
-            np.save('./out/best_elite_vector_data.npy', best_data)
+            np.save(f'./out/best_{tetromino_randomisation_scheme}_noisy_cem_multivariate_{seed}.npy', best_data)
 
         elite_mean_avg_scores_log.append(avg_score_elite_mean)
 
         # Overwrites each iteration, maintaining all previous scores in real time
         np.save(
-            './out/simulation_CE_const_noise_scores.npy',
+            f'./out/means_{tetromino_randomisation_scheme}_noisy_cem_multivariate_{seed}.npy',
             elite_mean_avg_scores_log
         )
 
-def constant_noisy_cem_no_covariance(
+def constant_noisy_cem_univariate(
         iteration_count,
         rho,
         noise,
         weight_vector_size=8,
-        n_processes=None
+        n_processes=None,
+        seed=None,
+        tetromino_randomisation_scheme=None
     ):
     """
     Optimises a weight vector which maximises Tetris score using the
-    cross-entropy method with constant noise. Does not use covariance matrix and
-    assumes a learning rate of 1.0 as inferred from the paper since the authors
-    mention CMA-ES with constant noise as an extension of the CEM algorithm described:
-    https://inria.hal.science/inria-00418930/document
+    cross-entropy method with constant noise. Samples vectors from a
+    univariate normal distribution (each feature is sampled independently)
+    and assumes a learning rate of 1.0. It can be inferred this is the method used
+    in the paper since the authors mention CMA-ES with constant noise as an extension
+    of the CEM algorithm described: https://inria.hal.science/inria-00418930/document
     Parameters:
     - iteration_count: Number of iterations to run the simulation.
     - rho: Fraction of vectors that are selected for the next generation.
     - noise: Constant noise value to add to the variance of each feature.
     - weight_vector_size: Dependent on which feature set is used
     - n_processes: Number of processes to use for parallel evaluation
+    - seed: Seed randomness for reproducibility.
+    - tetromino_randomisation_scheme: Scheme for randomising tetromino generation.
     """
+
+    if tetromino_randomisation_scheme not in ["uniform", "bag"]:
+        raise ValueError("Tetromino randomisation scheme must be either 'uniform' or 'bag'.")
+    if seed is None:
+        raise ValueError("Seed must be provided for reproducibility.")
+
+    # Seed randomness in main loop
+    np.random.seed(seed)
+    random.seed(seed)
 
     if n_processes is None:
         n_processes = mp.cpu_count() - 1
@@ -175,9 +232,21 @@ def constant_noisy_cem_no_covariance(
             size=(n_sampled_vectors, weight_vector_size)
         )
 
+        # Preprocess the vectors to include seed and tetromino randomisation scheme
+        # The seed is converted to base 100 to ensure uniqueness across iterations and samples
+        # The first set of samples have seed >= 1 million to avoid collisions with
+        # seeds used for evaluating the mean elite vector later in the loop
+        sample_vectors_mp_input = [
+            (
+                vector,
+                (seed+1) * (100 ** 3) + iteration_index * (100 ** 1) + sample_index * (100 ** 0),
+                tetromino_randomisation_scheme
+            ) for sample_index, vector in enumerate(sample_vectors)
+        ]
+
         # Using multiprocessing to evaluate samples in parallel
         with mp.Pool(processes=n_processes) as pool:
-            sample_evaluation_scores = pool.map(evaluate_sample, sample_vectors)
+            sample_evaluation_scores = pool.map(evaluate_sample, sample_vectors_mp_input)
 
         # Calculate the top k (rho * N) best vectors
         k = math.floor(n_sampled_vectors * rho)
@@ -206,9 +275,18 @@ def constant_noisy_cem_no_covariance(
         mean_prev = mean_next
         var_prev = var_next
 
+        # Preprocess elite mean vector for parallel evaluation
+        elite_mean_vector_mp_input = [
+            (
+                elite_mean_vector,
+                seed * (100 ** 2) + iteration_index * (100 ** 1) + sample_index * (100 ** 0),
+                tetromino_randomisation_scheme
+            ) for sample_index in range(30)
+        ]
+
         # Run 30 simulations in parallel with the elite mean vector
         with mp.Pool(processes=n_processes) as pool:
-            elite_vector_scores = pool.map(evaluate_sample, [elite_mean_vector for _ in range(30)])
+            elite_vector_scores = pool.map(evaluate_sample, elite_mean_vector_mp_input)
 
         # Avg score of 30 Tetris simulations using elite mean vector of the current generation
         avg_score_elite_mean = np.mean(elite_vector_scores)
@@ -223,85 +301,11 @@ def constant_noisy_cem_no_covariance(
                 'iteration': iteration_index + 1
             }
 
-            np.save('./out/best_elite_vector_data.npy', best_data)
+            np.save(f'./out/best_{tetromino_randomisation_scheme}_noisy_cem_univariate_{seed}.npy', best_data)
 
         elite_mean_avg_scores_log.append(avg_score_elite_mean)
 
         np.save(
-            './out/constant_noisy_cem_no_covariance_scores.npy',
+            f'./out/means_{tetromino_randomisation_scheme}_noisy_cem_univariate_{seed}.npy',
             elite_mean_avg_scores_log
         )
-
-def simulation_CE_deacr_noise(alpha, N_iteration,rho,a,b): #alpha : taux d'actualistion 
-                                   #N_mean: nombre de simulation par vecteur
-                                   #N_iteration : nombre d'iterations
-                                   #rho : the fraction of verctors that are selected
-                                   #retourne L_plot : le score maximal par itération
-                                   #noise : value of the constant noise to add
-                                   #a,b : params of the decreasing noise, a=5 , b=100 in the paper
-
-    # Initialisation
-    mu0 = [0]*21
-    sigma0 = np.diag([100]*21)
-    V0 = (mu0, sigma0)
-    parameters = [V0]
-    t=1
-
-    L_plot=[]
-    L_norm=[]
-    for j in range (N_iteration):
-
-
-        # Create the distribution
-        distribution = stats.multivariate_normal(parameters[t-1][0], parameters[t-1][1])
-        
-
-        # Evaluate each parameter pool
-        N = 100
-        sample_list = []
-        sample_score= []
-
-        for i in range(N):
-            
-            sample = distribution.rvs() #vecteur de paramètre W
-
-
-            sample_score.append(tetris_env.simulation(sample))
-            sample_list.append(sample)
-
-        # Keeping the rho*N bests vectors
-        k=math.floor(N*rho)
-
-        indices=sorted(range(len(sample_score)), key=lambda i: sample_score[i], reverse=True)[:k]
-        sample_high = [sample_list[i] for i in indices]
-        best_sample=sample_list[indices[0]]
-
-
-        # New parameter estimation using MLE
-
-
-        mean = np.mean(sample_high, axis = 0)
-        cov =  np.cov(sample_high, rowvar = False)
-        res = (mean, cov)
-
-        L_norm.append(np.linalg.norm(cov))
-        #add noise 
-        noise = max(0, a-N/b)
-        matrix_noise = np.diag([noise]*21)
-
-        parameters.append((alpha * np.array(res[0]) + (1 - alpha) * np.array(parameters[-1][0]),
-                        alpha ** 2 * np.array(res[1]) + (1 - alpha) ** 2 * np.array(parameters[-1][1])+matrix_noise))    
-
- #calcul de la moyenne du meilleur vecteur sur 30 parties
-        L_mean=[sample_score[indices[0]]] #liste des scores des 30 simulations
-        for k in range (29):
-            L_mean.append(tetris_env.simulation(best_sample))
-
-        print(np.mean(L_mean))
-        L_plot.append(L_mean)
-        t+=1
-        print(L_plot,L_norm,mean)
-    return(L_plot, L_norm,mean)
-
-
-     
