@@ -87,9 +87,10 @@ def constant_noisy_cem_multivariate(
         sample_vectors = distribution.rvs(size=n_sampled_vectors)
 
         # Preprocess the vectors to include seed and tetromino randomisation scheme
-        # The seed is converted to base 100 to ensure uniqueness across iterations and samples
-        # The first set of samples have seed >= 1 million to avoid collisions with
-        # seeds used for evaluating the mean elite vector later in the loop
+        # The seed is converted to base 100 to ensure uniqueness across iterations, samples
+        # and experiments since max(seed, iteration_index, sample_index) < 100.
+        # The first and second sets of evaluation_samples have seeds separated
+        # by a digit in base 100 (100 ** 3).
         sample_vectors_mp_input = [
             (
                 vector,
@@ -181,8 +182,9 @@ def constant_noisy_cem_univariate(
     cross-entropy method with constant noise. Samples vectors from a
     univariate normal distribution (each feature is sampled independently)
     and assumes a learning rate of 1.0. It can be inferred this is the method used
-    in the paper since the authors mention CMA-ES with constant noise as an extension
-    of the CEM algorithm described: https://inria.hal.science/inria-00418930/document
+    in Thierry and Scherrer's BCTS paper since the authors mention CMA-ES with constant
+    noise as an extension of the CEM algorithm described:
+    https://inria.hal.science/inria-00418930/document
     Parameters:
     - iteration_count: Number of iterations to run the simulation.
     - rho: Fraction of vectors that are selected for the next generation.
@@ -233,9 +235,10 @@ def constant_noisy_cem_univariate(
         )
 
         # Preprocess the vectors to include seed and tetromino randomisation scheme
-        # The seed is converted to base 100 to ensure uniqueness across iterations and samples
-        # The first set of samples have seed >= 1 million to avoid collisions with
-        # seeds used for evaluating the mean elite vector later in the loop
+        # The seed is converted to base 100 to ensure uniqueness across iterations, samples
+        # and experiments since max(seed, iteration_index, sample_index) < 100.
+        # The first and second sets of evaluation_samples have seeds separated
+        # by a digit in base 100 (100 ** 3).
         sample_vectors_mp_input = [
             (
                 vector,

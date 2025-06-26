@@ -8,11 +8,12 @@ import numpy as np
 
 def load_and_display_results(directory='./out'):
     """Load and print data from specified directory."""
-    pattern_best = os.path.join(directory, '*best*noisy_cem*.npy')
-    pattern_mean = os.path.join(directory, '*means*noisy_cem*.npy')
+    pattern_best = os.path.join(directory, 'best*noisy_cem*.npy')
+    pattern_means = os.path.join(directory, 'means*noisy_cem*.npy')
     files_best = glob.glob(pattern_best)
-    files_mean = glob.glob(pattern_mean)
-    if not files_best and not files_mean:
+    files_means = glob.glob(pattern_means)
+
+    if not files_best and not files_means:
         print("No files found.")
         return None
 
@@ -29,7 +30,7 @@ def load_and_display_results(directory='./out'):
         print("=" * 20)
         print()
 
-    for file in files_mean:
+    for file in files_means:
         print("=" * 20)
         print(f"file {file}")
         print("=" * 20)

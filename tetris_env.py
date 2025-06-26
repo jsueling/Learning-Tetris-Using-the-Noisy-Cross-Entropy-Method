@@ -46,8 +46,8 @@ class Tetromino:
     # The Tetromino's (x, y) coordinates reference the position
     # of where cell 0 in the 4x4 grid is located in the 10x20 grid.
 
-    def __init__(self, x, y, fig_type, rotation): 
-        self.x = x #position de la pièce sur la largeur du jeu 
+    def __init__(self, x, y, fig_type, rotation):
+        self.x = x #position de la pièce sur la largeur du jeu
         self.y = y #position de la pièce sur la longueur du jeu
         self.type = fig_type #type de la pièce entre 0 et 6
         self.rotation = rotation #rotation de la pièce
@@ -80,9 +80,7 @@ class Tetris:
             random.shuffle(self.bag)
 
     def new_tetromino(self, fig_type, x, y, rotation):
-        """
-        Creates a new Tetromino at the specified (x, y) and rotation.
-        """
+        """Creates a new Tetromino at the specified (x, y) and rotation."""
         self.current_tetromino = Tetromino(x, y, fig_type, rotation)
 
     def get_next_piece(self):
@@ -130,30 +128,29 @@ class Tetris:
     def break_lines(self):
         """Break lines that are completely filled by Tetrominoes."""
 
-        # credits to https://github.com/nuno-faria/tetris-ai/blob/master/tetris.py#L161
         filled_lines = np.all(self.grid > 0, axis=1)
-        # filled lines now become broken lines
+        # All filled lines now become broken lines
         broken_lines = np.count_nonzero(filled_lines)
         if broken_lines > 0:
             self.grid = np.vstack((
                 # Add empty rows at the top to replace the broken lines
                 np.zeros((broken_lines, self.width), dtype=int),
-                # Keep only rows that were not full
+                # Keep only rows that were not filled (maintains ordering)
                 self.grid[~filled_lines]
             ))
-            # Store the most recently broken lines
+            # Store the indices of the most recently broken lines (used in eroded_piece_cells)
             self.broken_line_indices = set(np.flatnonzero(filled_lines))
             self.score += broken_lines
 
     def hard_drop(self, colour=1):
-        """Move the current figure directly down to the bottom of the grid."""
+        """Move the current tetromino directly down to the bottom of the grid."""
         while not self.intersects():
             self.current_tetromino.y += 1
         self.current_tetromino.y -= 1
         self.freeze(colour)
 
     def freeze(self, colour):
-        """Freeze the current figure, it now becomes part of the grid."""
+        """Freeze the current tetromino, it now becomes part of the grid."""
         x, y = self.current_tetromino.x, self.current_tetromino.y
         for cell_index in self.current_tetromino.image():
             tetromino_row = y + (cell_index // 4)
@@ -183,10 +180,11 @@ def get_column_heights(grid_filled):
     heights = np.zeros((grid_filled.shape[1],), dtype=int)
     for col in range(grid_filled.shape[1]):
         if grid_filled[:, col].any():
-            # If the column has filled cells, calculate height where
+            # If the column has filled cells, calculate its height.
             # argmax returns the index of the first True value traversed
             # from top to bottom i.e. the first filled cell for this column
             heights[col] = grid_filled.shape[0] - grid_filled[:, col].argmax()
+        # Otherwise the column height is 0 and no action is needed
     return heights
 
 def get_adj_col_height_diffs(grid):
@@ -206,7 +204,7 @@ def count_holes(grid_filled, column_heights):
         # For each column, accumulate and count holes below the
         # row of the highest filled cell in the column
         start_row = grid_filled.shape[0] - column_heights[col] + 1
-        hole_count += np.count_nonzero(grid_filled[start_row:, col])
+        hole_count += np.count_nonzero(grid_filled[start_row:, col] == 0)
     return hole_count
 
 # Evalue la configuration de la grille en pondérant les features par le vecteur W de taille 21
@@ -237,7 +235,7 @@ def evaluate_bertsekas(weight_vector, game):
 
     return score
 
-def evaluate_best_move(weight_vector, grid, fig_type, color):
+def evaluate_best_move(weight_vector, grid, fig_type, colour):
     """
     Evaluates all valid placements and returns the best column and rotation.
     """
@@ -246,6 +244,8 @@ def evaluate_best_move(weight_vector, grid, fig_type, color):
     best_move = (100, 0)
     best_score = float('inf')
 
+    # Iterate through all possible rotations and columns for
+    # the current Tetromino (ignoring symmetrical rotations)
     for rotation in range(len(Tetromino.figures[fig_type])):
         for col in range(10):
 
@@ -259,7 +259,7 @@ def evaluate_best_move(weight_vector, grid, fig_type, color):
             if game_copy.intersects():
                 continue
 
-            game_copy.hard_drop(color)
+            game_copy.hard_drop(colour)
 
             score = evaluate_bcts(weight_vector, game_copy)
             if score < best_score:
@@ -290,10 +290,10 @@ def simulation(weight_vector, seed=None, tetromino_randomisation_scheme=None):
 
         fig_type = game.get_next_piece()
 
-        color = 1
+        colour = 1
 
         # Evaluates all possible columns and rotations for the current Tetromino
-        col, rotation = evaluate_best_move(weight_vector, game.grid, fig_type, color)
+        col, rotation = evaluate_best_move(weight_vector, game.grid, fig_type, colour)
 
         # Attempt to place the Tetromino in the best column and rotation
         game.new_tetromino(fig_type, col, 0, rotation)
@@ -301,7 +301,7 @@ def simulation(weight_vector, seed=None, tetromino_randomisation_scheme=None):
         if game.intersects():
             game.state = "gameover"
         else:
-            game.hard_drop(color)
+            game.hard_drop(colour)
 
     return game.score
 
@@ -319,16 +319,16 @@ def simulation_data_collection(weight_vector, max_samples=1000, sample_freq=10):
 
         fig_type = game.get_next_piece()
 
-        color = 1
+        colour = 1
 
-        col, rotation = evaluate_best_move(weight_vector, game.grid, fig_type, color)
+        col, rotation = evaluate_best_move(weight_vector, game.grid, fig_type, colour)
 
         game.new_tetromino(fig_type, col, 0, rotation)
 
         if game.intersects():
             break
 
-        game.hard_drop(color)
+        game.hard_drop(colour)
 
         if move_counter > 0 and move_counter % sample_freq == 0:
             # 200 binary features for the grid (20x10 flattened)
@@ -351,16 +351,16 @@ def simulation_gif(weight_vector, num_moves=100): #Pas encore optimisé pour les
         for _ in range(num_moves):
 
             fig_type = game.get_next_piece()
-            color = random.randint(1, 4)
+            colour = random.randint(1, 4)
 
-            col, rotation = evaluate_best_move(weight_vector, game.grid, fig_type, color)
+            col, rotation = evaluate_best_move(weight_vector, game.grid, fig_type, colour)
 
             game.new_tetromino(fig_type, col, 0, rotation)
 
             if game.intersects():
                 break
 
-            game.hard_drop(color)
+            game.hard_drop(colour)
 
             fig, ax = plt.subplots()
             ax.set_title(str(game.score))

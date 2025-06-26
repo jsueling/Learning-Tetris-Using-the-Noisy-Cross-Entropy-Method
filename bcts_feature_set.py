@@ -38,9 +38,8 @@ def rows_with_holes(game, column_heights):
 
 def landing_height(game):
     """
-    Calculates landing height which is the row of the lowest
-    filled cell of the last placed Tetromino leading to this grid configuration
-    (ranges from 1 to grid height)
+    Calculated as the height of the lowest cell of the last
+    placed Tetromino leading to this grid configuration (ranges from 1 to grid height)
     """
     current_tetromino = game.current_tetromino
     row = current_tetromino.y
