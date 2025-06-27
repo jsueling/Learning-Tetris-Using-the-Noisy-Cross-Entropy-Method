@@ -84,7 +84,12 @@ def constant_noisy_cem_multivariate(
             cov=cov_prev
         )
 
-        sample_vectors = distribution.rvs(size=n_sampled_vectors)
+        sample_vectors = distribution.rvs(
+            size=n_sampled_vectors,
+            random_state=np.random.default_rng(
+                iteration_index * (100 ** 0) + (seed+1) * (100 ** 1)
+            )
+        )
 
         # Preprocess the vectors to include seed and tetromino randomisation scheme
         # The seed is converted to base 100 to ensure uniqueness across iterations, samples

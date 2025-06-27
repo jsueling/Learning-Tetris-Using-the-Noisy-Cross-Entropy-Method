@@ -174,18 +174,22 @@ class Tetris:
                     return False
         return True
 
-def get_column_heights(grid_filled):
+def get_column_heights(filled_cell_mask):
     """Returns the height of each column in the grid in order as a list."""
 
-    heights = np.zeros((grid_filled.shape[1],), dtype=int)
-    for col in range(grid_filled.shape[1]):
-        if grid_filled[:, col].any():
-            # If the column has filled cells, calculate its height.
-            # argmax returns the index of the first True value traversed
-            # from top to bottom i.e. the first filled cell for this column
-            heights[col] = grid_filled.shape[0] - grid_filled[:, col].argmax()
-        # Otherwise the column height is 0 and no action is needed
-    return heights
+    height = filled_cell_mask.shape[0]
+
+    # If column has filled cells, it has a height of:
+    # board_height - index_of_first_filled_cell
+    # which np.argmax finds per column (first True top to bottom).
+    # Otherwise it is empty and has a height of 0.
+    column_heights = np.where(
+        np.any(filled_cell_mask, axis=0),
+        height - np.argmax(filled_cell_mask, axis=0),
+        0
+    )
+
+    return column_heights # shape (width,)
 
 def get_adj_col_height_diffs(grid):
     """Returns the absolute difference between all adjacent columns."""
@@ -197,14 +201,14 @@ def get_adj_col_height_diffs(grid):
 
     return adj_col_height_diffs
 
-def count_holes(grid_filled, column_heights):
+def count_holes(filled_cell_mask, column_heights):
     """Count the number of inaccessible holes in the Tetris grid."""
     hole_count = 0
-    for col in range(grid_filled.shape[1]):
+    for col in range(filled_cell_mask.shape[1]):
         # For each column, accumulate and count holes below the
         # row of the highest filled cell in the column
-        start_row = grid_filled.shape[0] - column_heights[col] + 1
-        hole_count += np.count_nonzero(grid_filled[start_row:, col] == 0)
+        start_row = filled_cell_mask.shape[0] - column_heights[col] + 1
+        hole_count += np.count_nonzero(filled_cell_mask[start_row:, col] == 0)
     return hole_count
 
 # Evalue la configuration de la grille en pondérant les features par le vecteur W de taille 21
@@ -213,12 +217,12 @@ def evaluate_bertsekas(weight_vector, game):
     # weight_vector = [w1, ..., w21] vector of parameters to tune
 
     grid = game.grid
-  # Convert to boolean grid for filled cells
-    grid_filled = (grid > 0)
+    # Convert to boolean mask of filled cells
+    filled_cell_mask = grid > 0 # shape (height, width)
 
-    col_heights = get_column_heights(grid_filled)
+    col_heights = get_column_heights(filled_cell_mask)
     adj_col_height_diffs = get_adj_col_height_diffs(grid)
-    holes = count_holes(grid_filled, col_heights)
+    holes = count_holes(filled_cell_mask, col_heights)
     max_col_height = max(col_heights)
 
     score = 0
