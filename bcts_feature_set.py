@@ -111,7 +111,7 @@ def get_wells_score(filled_cell_mask, above_surface_mask):
 
         # The score for a well of depth d is the sum of the arithmetic series:
         # d * (d + 1) / 2
-        well_score += np.sum(well_depth * (well_depth + 1) // 2)
+        well_score += well_depth * (well_depth + 1) // 2
 
     # Σ_w_∈_wells (1 + 2 + ... + depth(w))
     return well_score
@@ -129,7 +129,7 @@ def get_hole_features(cell_filled_mask, at_or_below_surface_mask):
     # True evaluates to 1, False to 0
     count_holes = np.sum(hole_mask)
 
-    # +1 per row if any value in the hole_mask is True
+    # +1 per row if any value in the hole_mask is True along that row
     count_rows_with_holes = np.sum(np.any(hole_mask, axis=1))
 
     # Sum of filled cells above each hole, maintains shape (height, width)
@@ -154,9 +154,9 @@ def evaluate_bcts(weight_vector, game):
 
     # Create broadcastable column vector of row indices
     row_indices = np.arange(height)[:, np.newaxis]
-    # Compare each row index with indices of the column heights
-    # broadcasts shape to (height, width)
-    # at_or_below_surface_mask is True for any cell at or below the column height
+    # Compare each row index (broadcasts shape to (height, width)) with indices
+    # of the highest filled cell per column given by (height - column_heights).
+    # at_or_below_surface_mask is thus True for any cell at or below the column height
     # where column heights are the highest filled cell in each column
     at_or_below_surface_mask = row_indices >= (height - column_heights)
 
