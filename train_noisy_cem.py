@@ -19,7 +19,7 @@ if __name__ == "__main__":
             tetromino_randomisation_scheme="uniform"
         )
 
-    for i in range(5, 10):
+    for i in range(0, 5):
         constant_noisy_cem_multivariate(
             alpha=ALPHA,
             iteration_count=TOTAL_ITERATIONS,
@@ -30,7 +30,7 @@ if __name__ == "__main__":
             tetromino_randomisation_scheme="uniform"
         )
 
-    for i in range(10, 15):
+    for i in range(5, 10):
         constant_noisy_cem_univariate(
             iteration_count=TOTAL_ITERATIONS,
             rho=RHO,
@@ -40,7 +40,7 @@ if __name__ == "__main__":
             tetromino_randomisation_scheme="bag"
         )
 
-    for i in range(15, 20):
+    for i in range(5, 10):
         constant_noisy_cem_multivariate(
             alpha=ALPHA,
             iteration_count=TOTAL_ITERATIONS,

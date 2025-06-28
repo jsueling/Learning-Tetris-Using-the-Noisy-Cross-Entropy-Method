@@ -163,7 +163,10 @@ def constant_noisy_cem_multivariate(
                 'iteration': iteration_index + 1
             }
 
-            np.save(f'./out/best_{tetromino_randomisation_scheme}_noisy_cem_multivariate_{seed}.npy', best_data)
+            np.save(
+                f'./out/best_{tetromino_randomisation_scheme}_noisy_cem_multivariate_{seed}.npy',
+                best_data
+            )
 
         elite_mean_avg_scores_log.append(avg_score_elite_mean)
 
@@ -309,7 +312,10 @@ def constant_noisy_cem_univariate(
                 'iteration': iteration_index + 1
             }
 
-            np.save(f'./out/best_{tetromino_randomisation_scheme}_noisy_cem_univariate_{seed}.npy', best_data)
+            np.save(
+                f'./out/best_{tetromino_randomisation_scheme}_noisy_cem_univariate_{seed}.npy',
+                best_data
+            )
 
         elite_mean_avg_scores_log.append(avg_score_elite_mean)
 
