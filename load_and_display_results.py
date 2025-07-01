@@ -24,7 +24,15 @@ def load_and_display_results(directory='./out'):
         for k, v in data.items():
             if isinstance(v, np.ndarray):
                 data[k] = v.tolist()
-        print(json.dumps(data, indent=2))
+        print(
+            json.dumps(
+                {
+                    key: data[key] for key in data
+                    if key not in ["mean_prev", "cov_prev", "var_prev"]
+                },
+                indent=2
+            )
+        )
         print("=" * 20)
         print("=" * 20)
         print()
