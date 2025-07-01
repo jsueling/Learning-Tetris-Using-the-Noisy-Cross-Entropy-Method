@@ -16,7 +16,8 @@ if __name__ == "__main__":
             noise=NOISE,
             weight_vector_size=8,
             seed=i,
-            tetromino_randomisation_scheme="uniform"
+            tetromino_randomisation_scheme="uniform",
+            n_processes=None
         )
 
     for i in range(0, 5):
@@ -27,7 +28,8 @@ if __name__ == "__main__":
             noise=NOISE,
             weight_vector_size=8,
             seed=i,
-            tetromino_randomisation_scheme="uniform"
+            tetromino_randomisation_scheme="uniform",
+            n_processes=None
         )
 
     for i in range(5, 10):
@@ -37,7 +39,8 @@ if __name__ == "__main__":
             noise=NOISE,
             weight_vector_size=8,
             seed=i,
-            tetromino_randomisation_scheme="bag"
+            tetromino_randomisation_scheme="bag",
+            n_processes=None
         )
 
     for i in range(5, 10):
@@ -48,5 +51,6 @@ if __name__ == "__main__":
             noise=NOISE,
             weight_vector_size=8,
             seed=i,
-            tetromino_randomisation_scheme="bag"
+            tetromino_randomisation_scheme="bag",
+            n_processes=None
         )

@@ -8,16 +8,15 @@ import numpy as np
 
 def load_and_display_results(directory='./out'):
     """Load and print data from specified directory."""
-    pattern_best = os.path.join(directory, 'best*noisy_cem*.npy')
-    pattern_means = os.path.join(directory, 'means*noisy_cem*.npy')
-    files_best = glob.glob(pattern_best)
-    files_means = glob.glob(pattern_means)
+    pattern_data = os.path.join(directory, 'data*noisy_cem*.npy')
 
-    if not files_best and not files_means:
+    files_data = glob.glob(pattern_data)
+
+    if not files_data:
         print("No files found.")
-        return None
+        return
 
-    for file in files_best:
+    for file in files_data:
         print("=" * 20)
         print(f"file {file}")
         print("=" * 20)
@@ -26,15 +25,6 @@ def load_and_display_results(directory='./out'):
             if isinstance(v, np.ndarray):
                 data[k] = v.tolist()
         print(json.dumps(data, indent=2))
-        print("=" * 20)
-        print("=" * 20)
-        print()
-
-    for file in files_means:
-        print("=" * 20)
-        print(f"file {file}")
-        print("=" * 20)
-        print(np.load(file, allow_pickle=True))
         print("=" * 20)
         print("=" * 20)
         print()
