@@ -68,7 +68,8 @@ def constant_noisy_cem_multivariate(
         f'./out/data_{tetromino_randomisation_scheme}_noisy_cem_multivariate_{seed}.npy'
     )
 
-    # Attempt to load previous state if it exists.
+    # Attempt to load previous state if it exists and continue from where
+    # the last iteration left off.
     if os.path.exists(checkpoint_file):
 
         loaded_data = np.load(checkpoint_file, allow_pickle=True).item()
@@ -77,7 +78,12 @@ def constant_noisy_cem_multivariate(
         cov_prev = loaded_data['cov_prev']
         elite_mean_avg_scores_log = loaded_data['elite_mean_avg_scores_log']
 
-        print(type(elite_mean_avg_scores_log), type(mean_prev), type(cov_prev))
+        best_score_elite_mean = loaded_data['best_score']
+        best_scoring_vector_data = {
+            "best_elite_vector": loaded_data['best_elite_vector'],
+            "best_score": loaded_data['best_score'],
+            "best_iteration_index": loaded_data['best_iteration_index']
+        }
 
         # Continue from where the last iteration left off
         last_iteration_index = loaded_data['last_iteration_index']
@@ -88,10 +94,10 @@ def constant_noisy_cem_multivariate(
         cov_prev = cov_0
         elite_mean_avg_scores_log = []
 
-        start_index = 0
+        best_score_elite_mean = -np.inf
+        best_scoring_vector_data = {}
 
-    best_score_elite_mean = -np.inf
-    best_scoring_vector_data = {}
+        start_index = 0
 
     # The number of sampled vectors per generation
     n_sampled_vectors = 100
@@ -251,7 +257,8 @@ def constant_noisy_cem_univariate(
         f'./out/data_{tetromino_randomisation_scheme}_noisy_cem_univariate_{seed}.npy'
     )
 
-    # Attempt to load previous state if it exists.
+    # Attempt to load previous state if it exists and continue from where
+    # the last iteration left off.
     if os.path.exists(checkpoint_file):
 
         loaded_data = np.load(checkpoint_file, allow_pickle=True).item()
@@ -260,7 +267,13 @@ def constant_noisy_cem_univariate(
         var_prev = loaded_data['var_prev']
         elite_mean_avg_scores_log = loaded_data['elite_mean_avg_scores_log']
 
-        # Continue from where the last iteration left off
+        best_score_elite_mean = loaded_data['best_score']
+        best_scoring_vector_data = {
+            "best_elite_vector": loaded_data['best_elite_vector'],
+            "best_score": loaded_data['best_score'],
+            "best_iteration_index": loaded_data['best_iteration_index']
+        }
+
         last_iteration_index = loaded_data['last_iteration_index']
         start_index = last_iteration_index + 1
     else:
@@ -269,11 +282,11 @@ def constant_noisy_cem_univariate(
         var_prev = var_0
         elite_mean_avg_scores_log = []
 
-        start_index = 0
+        # Best score and associated data of elite mean vector across all iterations
+        best_score_elite_mean = -np.inf
+        best_scoring_vector_data = {}
 
-    # Best score and associated data of elite mean vector across all iterations
-    best_score_elite_mean = -np.inf
-    best_scoring_vector_data = {}
+        start_index = 0
 
     # The number of sampled vectors per generation
     n_sampled_vectors = 100
