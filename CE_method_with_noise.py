@@ -58,15 +58,46 @@ def constant_noisy_cem_multivariate(
         n_processes = mp.cpu_count() - 1
 
     # Initialisation
+    mean_0 = np.array([0] * weight_vector_size)
     var_0 = 100
-    mean_0 = [0] * weight_vector_size
     cov_0 = np.diag([var_0] * weight_vector_size)
 
-    mean_prev = np.array(mean_0)
-    cov_prev = cov_0
+    # Ensure output directory exists
+    os.makedirs('./out', exist_ok=True)
+    checkpoint_file = (
+        f'./out/data_{tetromino_randomisation_scheme}_noisy_cem_multivariate_{seed}.npy'
+    )
 
-    best_score_elite_mean = -np.inf
-    os.makedirs('./out', exist_ok=True)  # Ensure output directory exists
+    # Attempt to load previous state if it exists and continue from where
+    # the last iteration left off.
+    if os.path.exists(checkpoint_file):
+
+        loaded_data = np.load(checkpoint_file, allow_pickle=True).item()
+
+        mean_prev = loaded_data['mean_prev']
+        cov_prev = loaded_data['cov_prev']
+        elite_mean_avg_scores_log = loaded_data['elite_mean_avg_scores_log']
+
+        best_score_elite_mean = loaded_data['best_score']
+        best_scoring_vector_data = {
+            "best_elite_vector": loaded_data['best_elite_vector'],
+            "best_score": loaded_data['best_score'],
+            "best_iteration_index": loaded_data['best_iteration_index']
+        }
+
+        # Continue from where the last iteration left off
+        last_iteration_index = loaded_data['last_iteration_index']
+        start_index = last_iteration_index + 1
+    else:
+        # If no previous data exists, start fresh
+        mean_prev = mean_0
+        cov_prev = cov_0
+        elite_mean_avg_scores_log = []
+
+        best_score_elite_mean = -np.inf
+        best_scoring_vector_data = {}
+
+        start_index = 0
 
     # The number of sampled vectors per generation
     n_sampled_vectors = 100
@@ -74,9 +105,11 @@ def constant_noisy_cem_multivariate(
     # Create a constant noise matrix along the diagonal
     matrix_noise = np.diag([noise] * weight_vector_size)
 
-    elite_mean_avg_scores_log = []
-
-    for iteration_index in tqdm(range(iteration_count)):
+    for iteration_index in tqdm(
+        range(start_index, iteration_count),
+        initial=start_index,
+        total=iteration_count
+    ):
 
         # Create the distribution for this generation
         distribution = stats.multivariate_normal(
@@ -157,24 +190,23 @@ def constant_noisy_cem_multivariate(
 
             best_score_elite_mean = avg_score_elite_mean
 
-            best_data = {
+            best_scoring_vector_data = {
                 'best_elite_vector': elite_mean_vector,
-                'score': avg_score_elite_mean,
-                'iteration': iteration_index + 1
+                'best_score': best_score_elite_mean,
+                'best_iteration_index': iteration_index
             }
-
-            np.save(
-                f'./out/best_{tetromino_randomisation_scheme}_noisy_cem_multivariate_{seed}.npy',
-                best_data
-            )
 
         elite_mean_avg_scores_log.append(avg_score_elite_mean)
 
-        # Overwrites each iteration, maintaining all previous scores in real time
-        np.save(
-            f'./out/means_{tetromino_randomisation_scheme}_noisy_cem_multivariate_{seed}.npy',
-            elite_mean_avg_scores_log
-        )
+        checkpoint_data = {
+            'last_iteration_index': iteration_index,
+            'mean_prev': mean_prev,
+            'cov_prev': cov_prev,
+            'elite_mean_avg_scores_log': elite_mean_avg_scores_log,
+            **best_scoring_vector_data
+        }
+
+        np.save(checkpoint_file, checkpoint_data)
 
 def constant_noisy_cem_univariate(
         iteration_count,
@@ -216,14 +248,45 @@ def constant_noisy_cem_univariate(
         n_processes = mp.cpu_count() - 1
 
     # Initialisation
-    var_0 = [100] * weight_vector_size
-    mean_0 = [0] * weight_vector_size
+    mean_0 = np.array([0] * weight_vector_size)
+    var_0 = np.array([100] * weight_vector_size)
 
-    mean_prev = np.array(mean_0)
-    var_prev = np.array(var_0)
+    # Ensure output directory exists
+    os.makedirs('./out', exist_ok=True)
+    checkpoint_file = (
+        f'./out/data_{tetromino_randomisation_scheme}_noisy_cem_univariate_{seed}.npy'
+    )
 
-    best_score_elite_mean = -np.inf
-    os.makedirs('./out', exist_ok=True)  # Ensure output directory exists
+    # Attempt to load previous state if it exists and continue from where
+    # the last iteration left off.
+    if os.path.exists(checkpoint_file):
+
+        loaded_data = np.load(checkpoint_file, allow_pickle=True).item()
+
+        mean_prev = loaded_data['mean_prev']
+        var_prev = loaded_data['var_prev']
+        elite_mean_avg_scores_log = loaded_data['elite_mean_avg_scores_log']
+
+        best_score_elite_mean = loaded_data['best_score']
+        best_scoring_vector_data = {
+            "best_elite_vector": loaded_data['best_elite_vector'],
+            "best_score": loaded_data['best_score'],
+            "best_iteration_index": loaded_data['best_iteration_index']
+        }
+
+        last_iteration_index = loaded_data['last_iteration_index']
+        start_index = last_iteration_index + 1
+    else:
+        # If no previous data exists, start fresh
+        mean_prev = mean_0
+        var_prev = var_0
+        elite_mean_avg_scores_log = []
+
+        # Best score and associated data of elite mean vector across all iterations
+        best_score_elite_mean = -np.inf
+        best_scoring_vector_data = {}
+
+        start_index = 0
 
     # The number of sampled vectors per generation
     n_sampled_vectors = 100
@@ -231,9 +294,11 @@ def constant_noisy_cem_univariate(
     # to the variance of each feature at each iteration
     constant_noise = np.array([noise] * weight_vector_size)
 
-    elite_mean_avg_scores_log = []
-
-    for iteration_index in tqdm(range(iteration_count)):
+    for iteration_index in tqdm(
+        range(start_index, iteration_count),
+        initial=start_index,
+        total=iteration_count
+    ):
 
         # Sample vectors from a univariate normal distribution
         sample_vectors = np.random.normal(
@@ -306,20 +371,20 @@ def constant_noisy_cem_univariate(
 
             best_score_elite_mean = avg_score_elite_mean
 
-            best_data = {
+            best_scoring_vector_data = {
                 'best_elite_vector': elite_mean_vector,
-                'score': avg_score_elite_mean,
-                'iteration': iteration_index + 1
+                'best_score': best_score_elite_mean,
+                'best_iteration_index': iteration_index
             }
-
-            np.save(
-                f'./out/best_{tetromino_randomisation_scheme}_noisy_cem_univariate_{seed}.npy',
-                best_data
-            )
 
         elite_mean_avg_scores_log.append(avg_score_elite_mean)
 
-        np.save(
-            f'./out/means_{tetromino_randomisation_scheme}_noisy_cem_univariate_{seed}.npy',
-            elite_mean_avg_scores_log
-        )
+        checkpoint_data = {
+            'last_iteration_index': iteration_index,
+            'mean_prev': mean_prev,
+            'var_prev': var_prev,
+            'elite_mean_avg_scores_log': elite_mean_avg_scores_log,
+            **best_scoring_vector_data
+        }
+
+        np.save(checkpoint_file, checkpoint_data)

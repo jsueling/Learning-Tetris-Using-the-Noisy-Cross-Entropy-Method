@@ -13,14 +13,14 @@ class Tetromino:
 
     figures = [
         # Each figure is represented by a flattened 4x4 dimension
-        # with a list of each of the rotations it can take
-        [[0, 4, 8, 12], [0, 1, 2, 3]], # I
-        [[0, 1, 5, 6], [1, 4, 5, 8]], # Z
-        [[4, 5, 1, 2], [0, 4, 5, 9]], # S
+        # with a list of each of the unique rotations it can take
+        [[0, 4, 8, 12], [0, 1, 2, 3]],                            # I
+        [[0, 1, 5, 6], [1, 4, 5, 8]],                             # Z
+        [[4, 5, 1, 2], [0, 4, 5, 9]],                             # S
         [[1, 0, 4, 8], [0, 4, 5, 6], [1, 5, 9, 8], [0, 1, 2, 6]], # J
         [[0, 1, 5, 9], [4, 0, 1, 2], [0, 4, 8, 9], [4, 5, 6, 2]], # L
         [[1, 4, 5, 6], [1, 4, 5, 9], [0, 1, 2, 5], [0, 4, 8, 5]], # T
-        [[0, 1, 4, 5]], # O
+        [[0, 1, 4, 5]],                                           # O
     ]
 
     default_spawns = [
