@@ -1,7 +1,5 @@
 """Tetris environment for AI agents"""
 
-import random
-
 import numpy as np
 import matplotlib.pyplot as plt
 import imageio
@@ -46,11 +44,11 @@ class Tetromino:
     # The Tetromino's (x, y) coordinates reference the position
     # of where cell 0 in the 4x4 grid is located in the 10x20 grid.
 
-    def __init__(self, x, y, fig_type, rotation):
-        self.x = x #position de la pièce sur la largeur du jeu
-        self.y = y #position de la pièce sur la longueur du jeu
-        self.type = fig_type #type de la pièce entre 0 et 6
-        self.rotation = rotation #rotation de la pièce
+    def __init__(self, fig_type, x=None, y=None, rotation=None):
+        self.type = fig_type
+        self.x = x
+        self.y = y
+        self.rotation = rotation
 
     def image(self):
         """Returns the current 4x4 image of the Tetromino based on its type and rotation."""
@@ -61,13 +59,13 @@ class Tetris:
     Represents the Tetris game state,
     including the grid, current tetromino, score, and game state.
     """
-    def __init__(self, height, width, tetromino_randomisation_scheme="uniform"):
+    def __init__(self, height=20, width=10, tetromino_randomisation_scheme="uniform"):
         self.current_tetromino = None
         self.height = height
         self.width = width
         self.grid = np.zeros((height, width), dtype=int)
         self.score = 0
-        self.state = "start"
+        self.done = False
         # indices of rows broken by the last Tetromino placement
         self.broken_line_indices = set()
 
@@ -77,28 +75,40 @@ class Tetris:
         if self.tetromino_randomisation_scheme == "bag":
             # Initialise a bag of random Tetrominoes
             self.bag = list(range(len(Tetromino.figures)))
-            random.shuffle(self.bag)
+            np.random.shuffle(self.bag)
 
-    def new_tetromino(self, fig_type, x, y, rotation):
-        """Creates a new Tetromino at the specified (x, y) and rotation."""
-        self.current_tetromino = Tetromino(x, y, fig_type, rotation)
+    def new_tetromino(self, fig_type, x=None, y=None, rotation=None):
+        """
+        Creates a new Tetromino at the specified (x, y) and rotation.
+        """
+        self.current_tetromino = Tetromino(fig_type, x, y, rotation)
 
-    def get_next_piece(self):
+    def get_current_tetromino_type(self):
+        """
+        Returns the type of the current Tetromino (0-6).
+        If no Tetromino is currently active, returns None.
+        """
+        if self.current_tetromino:
+            return self.current_tetromino.type
+        return None
+
+    def get_next_piece(self, first_tetromino=False):
         """
         Returns the next piece type based on the randomisation scheme.
         For "uniform", it returns a random piece type.
         For "bag", it returns a piece type from a bag containing each
-        Tetromino in a random order, refilling and reshuffling it when empty.
+        Tetromino in a random order, refilling and reshuffling it when empty
+        or at the beginning of an episode.
         """
 
         if self.tetromino_randomisation_scheme == "uniform":
             # Randomly select a piece type uniformly
-            return random.randint(0, 6)
+            return np.random.randint(0, 7)
 
         if self.tetromino_randomisation_scheme == "bag":
-            if not self.bag:
+            if first_tetromino or not self.bag:
                 self.bag = list(range(len(Tetromino.figures)))
-                random.shuffle(self.bag)
+                np.random.shuffle(self.bag)
             return self.bag.pop()
 
         raise ValueError(
@@ -174,6 +184,49 @@ class Tetris:
                     return False
         return True
 
+    def reset(self):
+        """Reset the Tetris game state."""
+        self.grid.fill(0)
+        self.score = 0
+        self.done = False
+        # Attaches the first Tetromino with no position or rotation to the environment
+        self.new_tetromino(self.get_next_piece(first_tetromino=True))
+
+    def step(self, action: tuple[int, int]) -> tuple[bool, float]:
+        """
+        Performs a single step in the Tetris environment.
+        Arguments:
+        - action: A tuple (column, rotation) where rotation is the desired rotation \
+          of the Tetromino and column is the target column for placement.
+        Returns:
+        - done: True if the game is over (Tetromino cannot be placed),
+          False otherwise.
+        - reward: The reward for the action taken
+        """
+        column, rotation = action
+        prev_score = self.score
+        # Attempt to place Tetromino
+        self.new_tetromino(self.current_tetromino.type, column, 0, rotation)
+        if self.intersects():
+            return True, 0
+        self.hard_drop()
+        # The next Tetromino immediately replaces the old one
+        self.new_tetromino(self.get_next_piece())
+        reward = self.score - prev_score
+        return False, reward
+
+    def copy(self):
+        """Create a deep copy of the current game state."""
+        new_env = Tetris()
+        np.copyto(new_env.grid, self.grid)
+        new_env.score = self.score
+        new_env.done = self.done
+        if self.current_tetromino:
+            new_env.new_tetromino(self.get_current_tetromino_type())
+        if self.tetromino_randomisation_scheme == "bag":
+            new_env.bag = self.bag.copy()
+        return new_env
+
 def get_column_heights(filled_cell_mask):
     """Returns the height of each column in the grid in order as a list."""
 
@@ -239,9 +292,12 @@ def evaluate_bertsekas(weight_vector, game):
 
     return score
 
-def evaluate_best_move(weight_vector, grid, fig_type, colour):
+def evaluate_best_move(weight_vector, grid, fig_type, colour=1):
     """
     Evaluates all valid placements and returns the best column and rotation.
+    Returns:
+    - best_move: A tuple (column, rotation) representing the best placement
+    according to the evaluation function.
     """
 
     # If no valid moves are found, return invalid move since the game is over
@@ -286,11 +342,10 @@ def simulation(weight_vector, seed=None, tetromino_randomisation_scheme=None):
     if seed is None:
         raise ValueError("Seed must be provided for reproducibility.")
 
-    random.seed(seed)
     np.random.seed(seed)
 
     game = Tetris(20, 10, tetromino_randomisation_scheme=tetromino_randomisation_scheme)
-    while game.state != "gameover":
+    while not game.done:
 
         fig_type = game.get_next_piece()
 
@@ -303,7 +358,7 @@ def simulation(weight_vector, seed=None, tetromino_randomisation_scheme=None):
         game.new_tetromino(fig_type, col, 0, rotation)
         # evaluate_best_move may return invalid moves
         if game.intersects():
-            game.state = "gameover"
+            game.done = True
         else:
             game.hard_drop(colour)
 
@@ -355,7 +410,7 @@ def simulation_gif(weight_vector, num_moves=100): #Pas encore optimisé pour les
         for _ in range(num_moves):
 
             fig_type = game.get_next_piece()
-            colour = random.randint(1, 4)
+            colour = np.random.randint(1, 5)
 
             col, rotation = evaluate_best_move(weight_vector, game.grid, fig_type, colour)
 
