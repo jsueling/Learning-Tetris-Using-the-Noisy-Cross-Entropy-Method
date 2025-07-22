@@ -1,6 +1,6 @@
 """Training script for the cross-entropy method with constant noise."""
 
-from CE_method_with_noise import constant_noisy_cem_multivariate, constant_noisy_cem_univariate
+from constant_noisy_cem import constant_noisy_cem_multivariate, constant_noisy_cem_univariate
 
 if __name__ == "__main__":
 
