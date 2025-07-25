@@ -77,16 +77,6 @@ UPDATED_BEST_BCTS_WEIGHT_VECTOR = [
     58.99509032260189
 ]
 
-class TetrisSample:
-    """
-    Represents a sample from the Tetris environment.
-    n_step_rewards are an approximation of value function of
-    a pre-optimised evaluation function.
-    """
-    def __init__(self, grid, n_step_rewards):
-        self.grid = grid
-        self.n_step_rewards = n_step_rewards
-
 def collect_n_step_helper(env_copy: Tetris, n_steps, helper_seed):
     """
     Collects a single n-step sample from the Tetris environment.
@@ -126,10 +116,11 @@ def collect_n_step_sample(
         )
     copy_grid = np.zeros((20, 10), dtype=int)
     np.copyto(copy_grid, env.grid)
-    return TetrisSample(
-        grid=copy_grid,
-        n_step_rewards=n_step_rewards
-    )
+    tetris_sample = {
+        'grid': copy_grid,
+        'n_step_rewards': n_step_rewards
+    }
+    return tetris_sample
 
 def collect_n_step_samples(total_sample_target=50000, n_steps=125):
     """
