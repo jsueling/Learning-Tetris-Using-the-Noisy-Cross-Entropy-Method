@@ -30,6 +30,7 @@ The agent learns an optimal weight vector for a set of grid features, aiming to 
 ├── collect_tetris_state_samples.py # Utility to collect game data with a trained agent
 ├── Dockerfile             # Docker configuration for reproducible setup
 └── pyproject.toml         # Project dependencies
+└── ...
 ```
 
 ## Setup
